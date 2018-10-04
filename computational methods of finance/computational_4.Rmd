@@ -1,0 +1,534 @@
+---
+title: "Computational_4"
+author: "Garima Agarwal"
+date: "May 2, 2017"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Function}
+binum<-function(S0,X,r,T,sigma,u,d,h,n,p){
+  price=vector(length = (n+1))
+  option=matrix(nrow = (n+1),ncol=(n+1))
+  price[1]=S0
+  for(i in 1:length(price)){
+    price[i]=S0*(u^(n+1-i))*(d^(i-1))
+    option[(n+1),(i)]=max(0,(price[i]-X))
+  }
+  for(i in 1:n){
+    for(j in 1:(n-i+1)){
+      option[(n-i+1),j]=exp(-r*h)*(p*option[(n-i+2),j] + (1-p)*option[(n-i+2),(j+1)])
+    }
+  }
+  return (option[1,1])
+  
+  
+}
+
+binum_p_e<-function(S0,X,r,T,sigma,u,d,h,n,p){
+  price=vector(length = (n+1))
+  option=matrix(nrow = (n+1),ncol=(n+1))
+  price[1]=S0
+  for(i in 1:length(price)){
+    price[i]=S0*(u^(n+1-i))*(d^(i-1))
+    option[(n+1),(i)]=max(0,(X-price[i]))
+  }
+  for(i in 1:n){
+    for(j in 1:(n-i+1)){
+      
+      option[(n-i+1),j]=exp(-r*h)*(p*option[(n-i+2),j] + (1-p)*option[(n-i+2),(j+1)])
+    }
+  }
+  return (option[1,1])
+  
+  
+}
+binum_p_a<-function(S0,X,r,T,sigma,u,d,h,n,p){
+  price=vector(length = (n+1))
+  option=matrix(nrow = (n+1),ncol=(n+1))
+  price[1]=S0
+  for(i in 1:length(price)){
+    price[i]=S0*(u^(n+1-i))*(d^(i-1))
+    option[(n+1),(i)]=max(0,(X-price[i]))
+  }
+  price_l=matrix(nrow = (n+1),ncol=(n+1))
+
+  price_l[1,1]=S0
+  for(j in 2:(n+1))
+  {
+    for(k in 1:j)
+    {
+    price_l[k,j] <- S0*(u^(j-k))*(d^(k-1))
+    }
+  }
+  price_l=t(price_l)
+  optiont=matrix(nrow = (n+1),ncol=(n+1))
+  optiont[(n+1),]=option[(n+1),]
+  for(i in 1:n){
+    for(j in 1:(n-i+1)){
+      optiont[(n-i+1),j]=exp(-r*h)*(p*option[(n-i+2),j] + (1-p)*option[(n-i+2),(j+1)])
+      option[(n-i+1),j]=max(optiont[(n-i+1),j],(X-price_l[(n-i+1),j]))
+    }
+  }
+  return (option[1,1])
+  
+  
+}
+
+halton<-function(n,m){
+  s=vector(length = n)
+  num=1+ceiling(log(n)/log(m))
+  vet=m^(-(1:num))
+  work=vector(length = num)
+  for(i in 1:n){
+    j=1
+    ok=0
+    while(ok==0){
+      work[j]=work[j]+1
+      if(work[j]<m){
+        ok=1
+      }
+      else{
+        work[j]=0
+        j=j+1
+      }
+    }
+    s[i]=t(vet)%*%(work)
+  }
+  return(s)
+  
+}
+```
+
+#1
+```{r}
+S0 = 32
+X = 30
+r = 0.05
+sigma = 0.24
+T = 0.5
+n=c(10, 20, 40, 80, 100, 200, 500)
+price=matrix(nrow = length(n),ncol=4)
+#a)
+for(i in 1:length(n)){
+  h=T/n[i]
+  c=0.5*(exp(-r*h)+exp((r+(sigma^2))*h))
+  d=c- sqrt((c^2)-1)
+  u=1/d
+  p=(exp(r*h)-d)/(u-d)
+  price[i,1]=binum(S0,X,r,T,sigma,u,d,h,n[i],p)
+}
+plot(n,price[,1],type="b",col="Red",pch=2,ylim=c(3.7,3.8))
+par(new=TRUE)
+#b)
+for(i in 1:length(n)){
+  h=T/n[i]
+  u=exp(r*h)*(1+sqrt((exp((sigma^2)*h))-1))
+  d=exp(r*h)*(1-sqrt((exp((sigma^2)*h))-1))
+  p=0.5
+  price[i,2]=binum(S0,X,r,T,sigma,u,d,h,n[i],p)
+}
+plot(n,price[,2],type="b",col="Green",pch=4,ylim=c(3.7,3.8))
+par(new=TRUE)
+#c)
+for(i in 1:length(n)){
+  h=T/n[i]
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  p=0.5
+  price[i,3]=binum(S0,X,r,T,sigma,u,d,h,n[i],p)
+}
+plot(n,price[,3], type="b",col="Blue",pch=5,ylim=c(3.7,3.8))
+par(new=TRUE)
+#d)
+sigmap=.20
+for(i in 1:length(n)){
+  h=T/n[i]
+  u=exp(sigma*sqrt(h))
+  d=exp(-sigma*sqrt(h))
+  p=0.5 + 0.5*((r-((sigma^2)/2))*sqrt(h)/sigma)
+  price[i,4]=binum(S0,X,r,T,sigma,u,d,h,n[i],p)
+}
+plot(n,price[,4],type="b",col="Purple",pch=6,ylim=c(3.7,3.8))
+```
+
+
+#2
+
+```{r}
+#question 2
+library(plyr)
+setwd("C:/Users/garim/OneDrive/Documents/My ucla/q3/computational methods/week 4")
+google=read.csv("Google.csv")
+N=nrow(google)
+S0=google$Adj.Close[1]
+
+r <- .02
+X <- round_any(S0*1.1,10)
+T <- 8.5/12 #from may to jan, I have considered as nine months
+google$Date= as.Date(google$Date,"%m/%d/%y")
+
+ret=((google$Adj.Close[1:(N-1)])/google$Adj.Close[2:N])-1
+std=sd(ret)
+sigma=.203
+sigma=std*sqrt(252)
+n=500
+h=T/n
+c=0.5*(exp(-r*h)+exp((r+(sigmap^2))*h))
+d=c- sqrt((c^2)-1)
+u=1/d
+p=(exp(r*h)-d)/(u-d)
+pricec=binum(S0,X,r,T,sigma,u,d,h,n,p)
+
+#23.9
+actual_call=23.9
+i=.15
+while(i<sigma){
+  c=0.5*(exp(-r*h)+exp((r+(i^2))*h))
+  d=c- sqrt((c^2)-1)
+  u=1/d
+  p=(exp(r*h)-d)/(u-d)
+  price=binum(S0,X,r,T,i,u,d,h,n,p)
+  if((price-actual_call)>0){
+    break
+  }else{
+    i=i+0.002
+  }
+}
+
+```
+
+Price of my option is coming out to be `r toString(pricec)`
+
+Price given online is 23.9
+
+The reason behind the difference is the fact that Implied volatility is usually different that the historical volatility as we assumed. This is due to structural impacts and v=market's perception of future of Google. We only took in account the past effects but not future goals.
+
+The Implied we are getting by using 23.9 as our call price is `r i`.
+
+#3
+
+```{r}
+S0 =49
+X = 50
+r = 0.03
+sigma = 0.2
+T = 0.3846
+mu=.14
+n=500
+
+h=T/n
+u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+p=0.5
+
+s=matrix(nrow=31,ncol=2)
+call=matrix(nrow=31,ncol=2)
+j=1
+for(i in 20:80){
+  if(i%%2==0){
+    s[j,1]=i
+    s[j,2]=i+0.01
+    j=j+1
+  }
+}
+
+for(i in 1:31){
+  call[i,1]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  call[i,2]=binum(s[i,2],X,r,T,sigma,u,d,h,n,p)
+}
+
+delta=(call[,1]-call[,2])/(s[,1]-s[,2])
+
+plot(s[,1],delta,type="b",pch=1,col="Blue",lwd=3,ylab="Delta",xlab="Stock price")
+
+
+
+```
+
+#b
+
+```{r}
+S0=49
+t1=0
+t=matrix(nrow=39,ncol=2)
+call=matrix(nrow=39,ncol=2)
+j=1
+while(t1<=T){
+  
+    t[j,1]=t1
+    t[j,2]=t1+0.001
+    j=j+1
+    t1=t1+0.01
+  
+}
+
+for(i in 1:39){
+  h=t[i,1]/n
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,1]=binum(S0,X,r,t[i,1],sigma,u,d,h,n,p)
+  call[i,2]=binum((S0-0.01),X,r,t[i,1],sigma,u,d,h,n,p)
+}
+
+delta_t=(call[,1]-call[,2])/(0.01)
+
+plot(t[2:39,1],delta_t[2:39],type="b",pch=1,col="Green",lwd=3,ylab="Delta",xlab="Time")
+
+
+```
+
+#c
+
+```{r}
+call=matrix(nrow=31,ncol=2)
+for(i in 1:31){
+  h=T/n
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,1]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  h=(T+0.001)/n
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,2]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+}
+
+theta_s=(call[,1]-call[,2])/(0.001)
+
+plot(s[,1],theta_s,type="b",pch=3,col="Brown",lwd=5,ylab="Theta",xlab="Stock Price")
+```
+
+#d
+
+```{r}
+gamma=(delta[2:31]-delta[1:30])/(s[2:31,1]-s[1:30,1])
+plot(s[1:30,1],gamma,col="Blue",lwd=3,ylab="Gamma",xlab="Stock Price")
+```
+
+#e
+
+```{r}
+call=matrix(nrow=31,ncol=2)
+sigma1=sigma-0.001
+for(i in 1:31){
+  h=T/n
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,1]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  
+  u=exp((r-(sigma1^2))*h + (sigma1*sqrt(h)))
+  d=exp((r-(sigma1^2))*h - (sigma1*sqrt(h)))
+  call[i,2]=binum(s[i,1],X,r,T,sigma1,u,d,h,n,p)
+}
+vega_s=vector(length = 31)
+for(i in 1:31){
+  vega_s[i]=max((call[i,1]-call[i,2]),0)/(0.001)
+}
+plot(s[,1],vega_s,type="b",pch=3,col="Brown",lwd=5,ylab="Vega",xlab="Stock Price")
+
+```
+
+#f
+
+```{r}
+for(i in 1:31){
+  h=T/n
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,1]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  r=r-0.0001
+  u=exp((r-(sigma^2))*h + (sigma*sqrt(h)))
+  d=exp((r-(sigma^2))*h - (sigma*sqrt(h)))
+  call[i,2]=binum(s[i,1],X,r,T,sigma,u,d,h,n,p)
+}
+
+rho_s=(call[,1]-call[,2])/(0.0001)
+
+plot(s[,1],rho_s,type="b",pch=3,col="Brown",lwd=5,ylab="Rho",xlab="Stock Price")
+```
+
+#4
+
+```{r}
+X = 100
+r = 0.05
+sigma = 0.3
+T = 1
+n=500
+h=T/n
+c=0.5*(exp(-r*h)+exp((r+(sigma^2))*h))
+d=c- sqrt((c^2)-1)
+u=1/d
+p=(exp(r*h)-d)/(u-d)
+s=matrix(nrow=11,ncol=1)
+put=matrix(nrow=11,ncol=2)
+j=1
+for(i in 80:120){
+  if(i%%4==0){
+    s[j,1]=i
+    j=j+1
+  }
+}
+
+for(i in 1:11){
+  put[i,1]=binum_p_e(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  put[i,2]=binum_p_a(s[i,1],X,r,T,sigma,u,d,h,n,p)
+  
+}
+
+plot(s[,1],put[,1],type="l",ylim=c(0,24),col="red",ylab="Blue=American, Red=European")
+par(new=TRUE)
+plot(s[,1],put[,2],type="l",ylim=c(0,24),col="blue",ylab="Blue=American, Red=European")
+```
+
+The European put option price is lesser than the American put optionprice becase -there is no option to exercise earlier in a European put option.
+In American put options, we always take the higher payoffs so in European the payoffs will always be lesser.
+
+#5
+
+#a
+
+```{r}
+trinum<-function(S0,X,r,T,sigma,u,d,h,n,pu,pm,pd){
+  price=matrix(nrow = 2*(n+1),ncol=(n+1))
+  option=matrix(nrow = (n+1),ncol=(2*(n+1)-1))
+  price[1]=S0
+  price=vector(length = (2*(n+1)-1))
+  
+  for(i in 1:length(price)){
+    price[i]=S0*(u^(n+1-i))
+    option[(n+1),(i)]=max(0,(price[i]-X))
+  }
+  for(i in 1:(n)){
+    for(j in 1:((2*n)-(2*i)+1)){
+      
+      option[(n-i+1),j]=exp(-r*h)*(pu*option[(n-i+2),j] + pm*option[(n-i+2),(j+1)] + pd*option[(n-i+2),(j+2)])
+    }
+  }
+  return (option[1,1])
+  
+  
+}
+
+S0 = 32
+X = 30
+r = 0.05
+sigma = 0.24
+T = 0.5
+n=c(10, 20, 40, 80, 100, 200, 500)
+price=matrix(nrow = length(n),ncol=1)
+#a)
+for(i in 1:length(n)){
+  h=T/n[i]
+  d = exp(-sigma*sqrt(3*h))
+  u = 1/d
+  pd = ( (r*h*(1-u)) +((r*h)^2) + ((sigma^2)*h) )/( (u-d) * (1-d))
+  pu = ( (r*h*(1-d)) +((r*h)^2) + ((sigma^2)*h) )/( (u-d) * (u-1))
+  pm = 1 - pu - pd
+  price[i,1]=trinum(S0,X,r,T,sigma,u,d,h,n[i],pu,pm,pd)
+}
+plot(price[,1],type="b")
+
+```
+
+#b
+
+```{r}
+trinum_b<-function(S0,X,r,T,sigma,u,d,h,n,pu,pm,pd){
+  price=matrix(nrow = 2*(n+1),ncol=(n+1))
+  option=matrix(nrow = (n+1),ncol=(2*(n+1)-1))
+  price[1]=S0
+  price=vector(length = (2*(n+1)-1))
+  
+  for(i in 1:length(price)){
+    price[i]=S0+(u*(n+1-i))
+    option[(n+1),(i)]=max(0,(exp(price[i])-X))
+  }
+  for(i in 1:(n)){
+    for(j in 1:((2*n)-(2*i)+1)){
+      
+      option[(n-i+1),j]=exp(-r*h)*(pu*option[(n-i+2),j] + pm*option[(n-i+2),(j+1)] + pd*option[(n-i+2),(j+2)])
+    }
+  }
+  return (option[1,1])
+}
+
+
+S0 = 32
+X = 30
+r = 0.05
+sigma = 0.24
+T = 0.5
+X0=log(S0)
+n=c(10, 20, 40, 80, 100, 200, 500)
+pricer=matrix(nrow=7,ncol=1)
+for(i in 1:length(n)){
+  h=T/n[i]
+  d = (-sigma*sqrt(3*h))
+  u = -d
+  
+  pd = ((( ((sigma^2)*h) + ((r- ((sigma^2)/2))^2)*(h^2))/(u^2)) -
+          (((r- ((sigma^2)/2))*h)/u))/2
+  pu = ((( ((sigma^2)*h) + ((r- ((sigma^2)/2))^2)*(h^2))/(u^2)) +
+          (((r- ((sigma^2)/2))*h)/u))/2
+  pm = 1- pu - pd
+  pricer[i,1]=trinum_b(X0,X,r,T,sigma,u,d,h,n[i],pu,pm,pd)
+}
+plot(pricer[,1],type="b")
+```
+
+```{r}
+plot(price[,1],type="b",ylim=c(3.64,3.75),col="Red",ylab="Price")
+par(new=TRUE)
+plot(pricer[,1],type="b",ylim=c(3.64,3.75),col="Blue",ylab="Price")
+
+```
+
+#6
+
+```{r}
+
+N = 500
+r = 0.04
+sigma = 0.2
+S0 = 88
+T =5
+X = 100
+b1 = 2
+b2 = 7
+
+h1=halton(N/2,b1)
+h2=halton(N/2,b2)
+
+z1=vector(length = N/2)
+z2=vector(length = N/2)
+
+z1=sqrt(-2*log(h1))*cos(2*pi*h2)
+z2=sqrt(-2*log(h1))*sin(2*pi*h2)
+
+z=c(z1,z2)
+
+st=S0*exp(((r-(sigma^2)/2)*T) + (sigma*sqrt(T)*z))
+n=length(st)
+c1=vector(length = n)
+for(i in 1:n){
+c1[i]=exp(-r*T)*max(0,(st[i]-X))
+}
+st=S0*exp(((r-(sigma^2)/2)*T) + (sigma*sqrt(T)*(-z)))
+
+c2=vector(length = n)
+for(i in 1:n){
+  c2[i]=exp(-r*T)*max(0,(st[i]-X))
+}
+
+call=(c1+c2)/2
+
+call_price=mean(call)
+```
+
+Call price coming out is `r toString(round(call_price,3))`

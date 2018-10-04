@@ -1,0 +1,439 @@
+---
+title: "Computational Methods in Finance"
+author: "Garima Agarwal"
+date: "April 25, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(pracma)
+```
+
+```{r functions}
+lgm<-function(n){
+  m = (2^31) - 1
+  a = (7^5)
+  x=vector(length = (n+1))
+  u=vector(length = n)
+  x[1]=as.numeric(Sys.time())
+  for(i in 2:(n+1))
+  {
+    x[i] = (a*x[i - 1])%%m
+    u[i-1] = (x[i]+0.5)/(m)
+  }
+  
+  return (u)
+}
+box<-function(u1,u2){
+  z1=((-2*log(u1))^(1/2))*cos(2*pi*u2)
+  z2=((-2*log(u1))^(1/2))*sin(2*pi*u2)
+  return(z1)
+}
+
+
+
+
+set.seed('0')
+n=1000
+```
+#1
+Evaluate the following expected values and probabilities:
+$Prob(Y_{2}>5)$
+$E[X_{2}^{1/3}], E[Y_{3}]$ and $E[X_{2}Y_{2}1(X_{2}>1)]$
+```{r}
+generate_y<-function(t,n,y0){
+  z1=box(lgm(n),lgm(n))
+  y=vector(length = n)
+  y[1]=y0
+  h=t/n
+  for(i in 2:n){
+    T=h*(i-1)
+    y[i]=y[(i-1)] + ((2/(1+T))*y[(i-1)] + (1 + T^3)/3)*h + ((1+T^3)/3)*z1[i]*sqrt(h)
+  }
+  return (y[n])
+  
+}
+generate_x<-function(t,n,x0){
+  z1=box(lgm(n),lgm(n))
+  y=vector(length = n)
+  y[1]=x0
+  h=t/n
+  for(i in 2:n){
+    T=h*(i-1)
+    y[i]=y[(i-1)] + (0.2-((0.5)*y[(i-1)]))*h + (2/3)*z1[i]*sqrt(h)
+  }
+  return (y[n])
+  
+}
+
+
+t=2
+x=vector(length = n)
+y=vector(length = n)
+for(i in 1:n){
+  x[i]=generate_x(t,n,1)
+  y[i]=generate_y(t,n,.75)
+}
+prob_5=sum(y>5)/n
+expected_x2_3=sum(nthroot(x,3))/n
+expected_x2_y2=sum(x*y*(x>1))/n
+y3=vector(length = n)
+for(i in 1:n){
+  
+  y3[i]=generate_y(3,n,.75)
+}
+expected_y3=mean(y3)
+
+p=c(prob_5,expected_x2_3,expected_y3,expected_x2_y2)
+p=as.matrix(p)
+rownames(p)<-c("Prob","E1","E2","E3")
+kable(p)
+
+```
+
+#2
+
+Estimate the following expected values:
+$E[(1+X_{3})^{1/3}]$ and $E[(1+Y_{3})^{1/3}]$
+```{r}
+generate_x<-function(t,n,x0){
+  z1=box(lgm(n),lgm(n))
+  z2=box(lgm(n),lgm(n))
+  x=vector(length = n)
+  x[1]=x0
+  h=t/n
+  for(i in 2:n){
+    T=h*(i-1)
+    x[i]=x[(i-1)] +((1/4)*x[(i-1)]*h)+((1/3)*x[(i-1)]*z1[i]*sqrt(h)) -((3/4)*x[(i-1)]*z2[i]*sqrt(h))
+  }
+  return (x[n])
+  
+}
+x3=vector(length = n)
+for(i in 1:n){
+  x3[i]=generate_x(3,n,1)
+}
+expect_x3=sum(1+((x3)^(1/3)))/n
+  z1=box(lgm(n),lgm(n))
+  z2=box(lgm(n),lgm(n))
+y3=exp((-0.08*3)+((1/3)*sqrt(3)*z1)+((3/4)*sqrt(3)*z2))
+expect_y3=sum(1+((y3)^(1/3)))/n
+ta=c(expect_x3,expect_y3)
+ta=as.matrix(ta)
+rownames(ta)<-c("E1","E2")
+kable(ta)
+
+```
+#3
+
+(a) Write code to compute the prices of European Call options via Monte Carlo simulation. Use variance reduction techniques (e.g. Antithetic variates) in your estimation.
+
+For this I am assuming
+S0=100,
+X=100,
+T=0.25
+r=0.05,
+$\sigma=0.20$
+
+```{r}
+call<-function(s0,T,X,r,sigma){
+  z2=box(lgm(1000),lgm(1000))
+  st=s0*exp((r-(sigma^2))*T + sigma*sqrt(T)*z2)
+  payoff=vector(length = length(st))
+  for(i in 1:length(st))
+  {
+    payoff[i]=max(0,(st[i]-X))
+  }
+  st=s0*exp((r-(sigma^2))*T + sigma*sqrt(T)*(-z2))
+  payoff_c=vector(length = length(st))
+  for(i in 1:length(st))
+  {
+    payoff_c[i]=max(0,(st[i]-X))
+  }
+  pay=(payoff_c+payoff)/2
+  call=exp(-r*T)*mean(pay)
+  return(call)
+}
+```
+
+Call price using Monte Carlo is 
+```{r}
+call(100,0.25,100,0.05,0.2)
+
+```
+
+(b) Write code to compute the prices of European Call options by using the Black-Scholes formula. Use the approximation of N(.) described in this chapter.
+
+$d_{1}(t,S_{}t)=(1/\sigma\sqrt{T})(ln(S/X)+(r + \sigma^{2}/2)T)$
+
+$d_{2}(t,S_{t}) = d_{1}(t,S_{}t) - \sigma\sqrt{T}$
+
+$call = S_{T}N[d_{1}(t,S_{}t)]-e^{rT}KN[d_{2}(t,S_{}t)]$
+
+
+```{r}
+nor<-function(x){
+  d1=0.0498673470*x
+  d2=0.0211410061*(x^2)
+  d3=0.0032776263*(x^3)
+  d4=0.0000380036*(x^4)
+  d5=0.0000488906*(x^5)
+  d6=0.0000053830*(x^6)
+  n=1-((1/2)*((1+ d1+d2+d3+d4+d5+d6)^(-16)))
+  return(n)
+}
+call_bs<-function(s0,T,X,r,sigma){
+  d1=(1/(sigma*sqrt(T)))*(log(s0/X) + (r+((sigma^2)/2))*T)
+  d2=d1-(sigma*sqrt(T))
+  if(d1>=0){
+    n1=nor(d1)
+  }else{
+    n1=1-nor(-d1)
+  }
+  if(d2>=0){
+    n2=nor(d2)
+  }else{
+    n2=1-nor(-d2)
+  }  
+  price=(s0*n1) - (X*(exp(-r*T))*n2)
+  return (price)
+}
+cat("Call price using Black-Scholes is ")
+call_bs(100,0.25,100,0.05,0.2)
+```
+
+(c) Estimate the hedging parameters of European Call options (all five Greeks) and graph them as functions of the initial stock price
+
+
+```{r}
+
+greek<-function(s0,T,X,r,sigma){
+  d1=(1/(sigma*sqrt(T)))*(log(s0/X) + (r+((sigma^2)/2))*T)
+  d2=d1-(sigma*sqrt(T))
+  if(d1>=0){
+    n1=nor(d1)
+  }else{
+    n1=1-nor(-d1)
+  }
+  if(d2>=0){
+    n2=nor(d2)
+  }else{
+    n2=1-nor(-d2)
+  }  
+  price=(s0*n1) - (X*(exp(-r*T))*n2)
+  
+  #To compute the pdf
+
+
+n_d1 = exp((-d1^2)/2)/sqrt(2*pi);
+n_d2 = exp((-d2^2)/2)/sqrt(2*pi);
+  delta=n1
+  gamma=n_d1/(s0*sigma*sqrt(T))
+  theta=((-s0*sigma*n_d1)/(2*sqrt(T))-(r*X*exp(-r*T)*n2))
+  vega = s0*sqrt(T)*n_d1
+  rho = X*T*exp(-r*T)*n2;
+  
+  x=c(delta,gamma,theta,vega,rho)
+  x=as.matrix(x)
+  rownames(x)<-c("Delta","Gamma","Theta","Vega","Rho")
+  return (x)
+}
+X=20
+sigma=0.25
+T=0.5
+r=0.04
+s0=15
+gre=matrix(nrow=5,ncol=11)
+s0=15:25
+for(i in 1:11){
+  gre[,i]=greek(s0[i],T,X,r,sigma)
+}
+plot(gre[1,],ylab="Delta",type="l",pch=4,col="Red")
+plot(gre[2,],ylab="Gamma",type="l",col="Blue")
+plot(gre[3,],ylab="Theta",type="l",col="Orange")
+plot(gre[4,],ylab="Vega",type="l",col="Green")
+plot(gre[5,],ylab="Rho",type="l",col="Brown")
+```
+
+#4
+Consider the following 2-factor model for stock prices with stochastic volatility:
+
+$dS_{t}=rS_{t}dt + \sqrt{V_{t}}S_{t}dW_{t}^{1}$
+
+$dV_{t}=\alpha(\beta - S_{t})dt + \sigma\sqrt{V_{t}}dW_{t}^{1}$
+
+where the Brownian Motion processes above are correlated with $\rho$
+Compute the price of a European Call option (via Monte Carlo simulation) that has a strike price of ???? and matures in ???? years.
+
+```{r}
+heston<-function(S0,V0,T, X, r, sigma,alpha,beta, rho,n){
+  z1=box(lgm(1000),lgm(1000))
+  z2=box(lgm(1000),lgm(1000))
+  w1=z1
+  w2=rho*z1 + ((sqrt(1-(rho^2)))*z2)
+  h=T/n
+  v1=vector(length = n)
+  v1[1]=V0
+  s1=vector(length = n)
+  s1[1]=S0
+  v2=vector(length = n)
+  v2[1]=V0
+  s2=vector(length = n)
+  s2[1]=S0
+  v3=vector(length = n)
+  v3[1]=V0
+  s3=vector(length = n)
+  s3[1]=S0
+  for(i in 2:n){
+    v1[i]=abs(v1[(i-1)])+(alpha*(beta-abs(v1[(i-1)]))*h + sigma*sqrt(abs(v1[(i-1)]))*w2[i]*sqrt(h))
+    s1[i]=s1[(i-1)]+r*s1[(i-1)]*h + sqrt(abs(v1[(i-1)]))*s1[(i-1)]*w1[i]*sqrt(h)
+    
+    
+    v2[i]=(v2[(i-1)])+(alpha*(beta-(v2[(i-1)]))*h + sigma*sqrt(max(v2[(i-1)],0))*w2[i]*sqrt(h))
+    s2[i]=s2[(i-1)]+r*s2[(i-1)]*h + sqrt(max(v2[(i-1)],0))*s2[(i-1)]*w1[i]*sqrt(h)
+    
+    v3[i]=(v3[(i-1)])+(alpha*(beta-max(v3[(i-1)],0))*h + sigma*sqrt(max(v3[(i-1)],0))*w2[i]*sqrt(h))
+    s3[i]=s3[(i-1)]+r*s3[(i-1)]*h + sqrt(max(v3[(i-1)],0))*s3[(i-1)]*w1[i]*sqrt(h)
+    
+  }
+  call=vector(length = 3)
+  call[1]=max(s1[n]-X,0)*exp(-r*T)
+  call[2]=max(s2[n]-X,0)*exp(-r*T)
+  call[3]=max(s3[n]-X,0)*exp(-r*T)
+  return(call)
+  
+}
+
+S0 = 48
+T=0.5
+X =50
+r= 0.03
+sigma = 0.42
+alpha = 5.8
+beta = 0.0625
+rho = -0.6
+nsteps = 1000
+V0 = 0.05
+call=matrix(nrow=n,ncol=3)
+for(i in 1:n){
+  call[i,]=heston(S0,V0,T, X, r, sigma,alpha,beta, rho,n)
+}
+call_reflection=mean(call[,1])
+call_partial=mean(call[,2])
+call_full=mean(call[,3])
+
+c=c(call_reflection,call_partial,call_full)
+c=as.matrix(c)
+rownames(c)<-c("C1-Reflection","C2-Partial Truncation","C3-Full Truncation")
+kable(c)
+```
+
+#5
+#a
+```{r}
+n=100
+u1=lgm(n)
+u2=lgm(n)
+```
+#b
+```{r}
+halton<-function(n,m){
+  s=vector(length = n)
+  num=1+ceiling(log(n)/log(m))
+  vet=m^(-(1:num))
+  work=vector(length = num)
+  for(i in 1:n){
+    j=1
+    ok=0
+    while(ok==0){
+      work[j]=work[j]+1
+      if(work[j]<m){
+        ok=1
+      }
+      else{
+        work[j]=0
+        j=j+1
+      }
+    }
+    s[i]=t(vet)%*%(work)
+  }
+  return(s)
+  
+}
+m=c(2,7)
+
+hal=matrix(nrow = n,ncol=2)
+for(j in 1:2){
+    hal[,j]=halton(n,m[j])
+}
+
+
+```
+
+#c
+
+```{r}
+m=c(2,4)
+
+hal2=matrix(nrow = n,ncol=2)
+for(j in 1:2){
+ 
+    hal2[,j]=halton(n,m[j])
+
+}
+
+
+
+
+```
+
+#d
+
+```{r}
+par(mfrow=c(1,3))
+plot(u1,u2,ylab="Uniform Distribution your LGM")
+plot(hal[,1],hal[,2],xlab="Base2",ylab="Base7")
+plot(hal2[,1],hal2[,2],xlab="Base2",ylab="Base4")
+```
+As we can see from the graphs, uniform is distributed everywhere, whereas Halton Methods show a pattern within themselves.
+
+We can identify that Halton (2,7) covers the maximum area and is most uniformly distributed(even more than LGM uniform technique).
+We can als see the Halton (2,4) are not well distributed due to the fact that 4 is not a prime number which is one of the requirement to implement Halton Models. Thus this set of bases is not a good selection.
+
+#e
+
+```{r}
+#x=halton()
+m=cbind(c(2,2,5),c(4,7,7))
+n=10000
+inte=vector(length = nrow(m))
+
+  hal4 = halton(n,4)
+  hal5 = halton(n,5)
+  hal2=halton(n,2)
+  hal7=halton(n,7)
+  
+  #for base 2,4
+  a=(exp(-hal2*hal4))
+  b=sin(6*pi*hal2)
+  c=nthroot(cos(2*pi*hal4),3)
+  inte[1]=mean(a*(b+c))
+  
+  #for base 2,7
+  a=(exp(-hal2*hal7))
+  b=sin(6*pi*hal2)
+  c=nthroot(cos(2*pi*hal7),3)
+  inte[2]=mean(a*(b+c))  
+
+  #for base 5,7
+  a=(exp(-hal5*hal7))
+  b=sin(6*pi*hal5)
+  c=nthroot(cos(2*pi*hal7),3)
+  inte[3]=mean(a*(b+c))
+  inte=as.matrix(inte)
+  rownames(inte)<-c("Base(2,4)","Base(2,7)","Base(5,7)")
+kable(inte,caption = "Integral Value")
+
+```

@@ -1,0 +1,468 @@
+---
+title: "Computational_Method_of_Finance_8"
+author: "Garima Agarwal"
+date: "May 28, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(OptionPricing)
+library(plyr)
+```
+
+#1
+```{r vasicek_functions}
+vasicek<-function(r0, sigma, kappa, rbar, T,dt){
+  n=T/dt
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(n+1))
+  r[,1]=r0
+  
+  for(i in 2:(n+1)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt +sigma*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1)]
+  P=mean(exp(-R))
+  return(P)
+}
+
+vasicek_r<-function(r0, sigma, kappa, rbar, T,dt,npath=500){
+  n=T/dt
+  
+  r=matrix(data=0,nrow=npath,ncol=(n+1))
+  r[,1]=r0
+  
+  for(i in 2:(n+1)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt +sigma*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1)]
+  P=mean(exp(-R))
+  return(cbind(r_fin,R))
+}
+```
+
+#a
+
+```{r price}
+r0 = 0.05
+sigma = 0.1
+kappa = 0.82
+rbar = 0.05
+T = 0.5
+FV = 1000
+dt = 1/360
+P=0
+price=FV*vasicek(r0, sigma, kappa, rbar, T,dt)
+price
+```
+
+#b
+
+```{r price_coupon}
+time=4
+coupon=c(rep(30,7),1030)
+T=c(.5,1,1.5,2,2.5,3,3.5,4)
+price=vector(length = 8)
+for(i in 1:8){
+  price[i]=coupon[i]*vasicek(r0, sigma, kappa, rbar, T[i],dt)
+}
+
+timeprice=sum(price)
+timeprice
+```
+
+#c
+
+
+
+```{r price_eu}
+K=980
+t=.25
+T=.5
+ret=vasicek_r(r0, sigma, kappa, rbar, t,dt)
+B=(1-exp(-kappa*(T-t)))/kappa
+A=exp((rbar-sigma^2/(2*kappa^2))*(B-(T-t)) - ((sigma^2)*(B^2)/(4*kappa)))
+P_t=FV*A*exp(-B*ret[,1])
+call=mean(exp(-ret[,2])*pmax((P_t-K),0))
+call
+
+```
+
+#d
+
+```{r price_eu_coupon}
+r0 = 0.05
+sigma = 0.1
+kappa = 0.82
+rbar = 0.05
+K = 980
+coupon=c(rep(30,7),1030)
+T=c(.5,1,1.5,2,2.5,3,3.5,4)
+FV = 1000
+dt = 1/360
+T= T-0.25
+t=0.25
+T=as.matrix(T)
+set.seed(6)
+ret= vasicek_r(r0, sigma, kappa, rbar, t,dt,200)
+price=vector(length = length(ret[,1]))
+for(i in 1:length(ret[,1])){
+  
+  #pv=vector(length = 8)
+  pv=coupon*apply(T,1,vasicek,r0=ret[i,1],sigma=sigma,kappa=kappa,rbar=rbar,dt=dt)
+  # for(j in 1:8){
+  #   pv[j]=coupon[j]*vasicek(ret[i,1],sigma,kappa,rbar,T[j],dt)
+  # }
+  price[i]=sum(pv)
+}
+call=mean(exp(-ret[,2])*pmax((price-K),0))
+call
+```
+
+#e
+
+```{r}
+T=c(.5,1,1.5,2,2.5,3,3.5,4)
+
+
+  A<-function(t,T){
+    f=exp((rbar-(sigma^2)/(2*kappa^2))*(B(t,T)-(T-t))-((sigma^2)*(B(t,T)^2)/(4*kappa)))
+    return (f)
+  }
+  B<-function(t,T){
+    f=(1-exp(-kappa*(T-t)))/kappa
+    return (f)
+  }
+  P<-function(t,T,r){
+    p=A(t,T)*exp(-B(t,T)*r)
+  }
+f<-function(r){
+   pr=P(t,T,r)
+  sqrt(mean((sum(coupon*P(t,T,r))-K)^2))
+}
+y=optimize(f,c(0,1))
+r=y$minimum
+k=P(t,T,r)
+ti=T
+  
+sigmap = (sigma/kappa)*(1-exp(-kappa*(T-t)))*sqrt((1-exp(-2*kappa*t))/(2*kappa))
+  
+PtTi = P(0,T,r0)
+PtT = P(0,t,r0)
+  
+d1 = 1/sigmap*log(PtTi/(k*PtT))+.5*sigmap
+d2 = d1 - sigmap
+   # Price of the individual options.
+c=sum(coupon*(PtTi*pnorm(d1)-k*PtT*pnorm(d2)))
+c
+```
+
+Both methods result in very similar values. Monte Carlo takes too much time to run compared to the second technique.
+
+#2
+
+```{r cir_function}
+cir<-function(r0, sigma, kappa, rbar, T,dt){
+  n=T/dt
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(n+1))
+  r[,1]=r0
+  
+  for(i in 2:(n+1)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt +sigma*sqrt(pmax(r[,(i-1)],0))*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1)]
+  P=mean(exp(-R))
+  return(P)
+}
+
+cir_r<-function(r0, sigma, kappa, rbar, T,dt){
+  n=T/dt
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(n+1))
+  r[,1]=r0
+  
+  for(i in 2:(n+1)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt + sigma*sqrt(pmax(r[,(i-1)],0))*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1)]
+  P=mean(exp(-R))
+  return(cbind(r_fin,R))
+}
+AB<-function(T, h1, h2, h3){
+    A = (h1*exp(h2*(T))/(h2*(exp(h1*(T))-1)+ h1))^h3
+    B = (exp(h1*(T))-1)/(h2*( exp(h1*(T)) - 1 ) + h1)
+    return(c(A,B))
+}
+ifd<-function(r0,sigma,kappa, rbar,T, dr,dt,rmin,rmax, FV, K){
+  npath=round(((rmax-rmin)/dr)+1)
+  nstep=(T/dt)+1
+  
+  r=vector(length = npath)
+  r[1]=rmax
+  for(i in 1:npath){
+    r[i]=rmax-(i-1)*dr
+  }
+  h1=sqrt((kappa^2) + 2*(sigma^2))
+  h2=(kappa + h1)/2
+  h3=(2*kappa*rbar)/(sigma^2)
+  ss=AB(T,h1,h2,h3)
+  a1=ss[1]
+  b1=ss[2]
+  prc_ts=vector(length = npath)
+  prc_ts=FV*a1*exp(-b1*(r))
+  
+  a=matrix(data=0,nrow=npath,ncol=npath)
+  a[1,1]=1
+  a[1,2]=-1
+  a[npath,npath]=-1
+  a[npath,(npath-1)]=1
+  
+  for(i in 2:(npath-1)){
+    a[i,(i-1)]=(-dt/(2*dr))*(((sigma^2)*(npath-i+1)) + kappa*(rbar - dr*(npath- i+ 1)))
+    a[i,i]=1 + ((dt/dr)*(sigma^2)*(npath-i+1)) + (dr*dt*(npath-i+1))
+    a[i,(i+1)]=(-dt/(2*dr))*(((sigma^2)*(npath-i+1))-kappa*(rbar- dr*(npath-i+1)))
+  }
+  f=matrix(data=0,nrow=npath,ncol=nstep)
+  f[,nstep]=pmax((prc_ts-K),0)
+  inv_a=solve(a)
+  b=vector(length = npath)
+  for(j in (nstep-1):1){
+    b=f[,(j+1)]
+    b[1]=prc_ts[1]-prc_ts[2]
+    b[npath]=0
+    f[,j]=inv_a%*%b
+  }
+  call=f[51,1]
+  return (call)
+}
+```
+
+#a
+```{r cir_price}
+r0 = 0.05
+sigma = 0.12
+kappa = 0.92
+rbar = 0.055
+T = 0.5
+S = 1
+FV = 1000
+n= 100
+K = 980
+timeleft = S-T
+dt=T/n
+set.seed(0)
+ret=cir_r(r0,sigma,kappa,rbar,T,dt)
+npath=nrow(ret)
+rt=ret[,1]
+rt=as.matrix(rt)
+#price=vector(length = npath)
+price=FV*apply(rt,1,cir,sigma=sigma,kappa=kappa,rbar=rbar,dt=dt,T=timeleft)
+call_cir=mean(exp(-ret[,2])*pmax((price-K),0))
+call_cir
+#price
+cir=matrix(nrow=3,ncol=1)
+cir[1,1]=call_cir
+
+
+```
+
+#b
+
+```{r ifd}
+r0 = 0.05
+sigma = 0.12
+kappa = 0.92
+rbar = 0.055
+T = 0.5
+S = 1
+FV = 1000
+K = 980
+rmin = 0
+rmax = 0.1
+dr = 0.001
+dt = 1/360
+
+call_ifd=ifd(r0,sigma,kappa, rbar,T, dr,dt,rmin,rmax, FV, K)
+cir[2,1]=call_ifd
+call_ifd
+```
+
+#c
+
+```{r}
+h1 = sqrt((kappa^2) + 2*(sigma^2))
+h2 = (kappa + h1)/ 2
+h3 = (2*kappa*rbar)/ (sigma^2)
+T = 0.5
+S = 1
+K = 0.98
+L = 1000
+Strike = 980
+
+ss=AB((S-T),h1,h2,h3)
+a=ss[1]
+b=ss[2]
+
+r=log(a/K)/b
+theta=sqrt((kappa^2) + 2*(sigma^2))
+phi=2*theta/((sigma^2)*(exp(theta*T)-1))
+zeta=(kappa+theta)/(sigma^2)
+
+ss=AB((S),h1,h2,h3)
+a1=ss[1]
+b1=ss[2]
+p_ts=a1*exp(-b1*r0)
+
+ss=AB((T),h1,h2,h3)
+a2=ss[1]
+b2=ss[2]
+p_tt=a2*exp(-b2*r0)
+
+x1=2*r*(phi+zeta+b)
+p1=(4*kappa*rbar/(sigma^2))
+q1=(2*(phi^2)*r0*exp(theta*T))/(phi+zeta+b)
+chi1=pchisq(x1,p1,q1)
+
+x2=2*r*(phi+zeta)
+p2=p1
+q2=(2*(phi^2)*r0*exp(theta*T))/(phi+zeta)
+chi2=pchisq(x2,p2,q2)
+
+ctTS=L*p_ts*chi1 - (Strike*chi2*p_tt)
+cir[3,1]=ctTS
+ctTS
+rownames(cir)<-c("Monte carlo","IFD","Closed form")
+kable(cir)
+```
+
+As we can see the values are almost similar thus proving the worth of all the methods. As we can observe, monte carlo takes the longest time and IFD has a higher convergence rate.
+
+#3
+```{r g2_function}
+generateV<-function(T, a,b, sigma,n,p){
+    V1 = ((sigma^2)*(T + (2*exp(-a*T)/a) - (exp(-2*a*T)/(2*a)) - (3/(2*a))))/(a^2)
+    V2 = ((n^2)*(T + (2*exp(-b*T)/b) - (exp(-2*b*T)/(2*b)) - (3/(2*b))))/(b^2)
+    V3 = (2*p*sigma*n*(T + ((exp(-a*T) - 1)/a) + ((exp(-b*T) - 1)/b) - ((exp(-(a+b)*T) - 1)/(a+b))))/(a*b)
+    V = V1 + V2 + V3
+    return (V)
+}
+g2<-function(p,a,b,sigma,x0,y0,n,phi_t,T){
+  nstep=180
+  dt=T/nstep
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  x=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  y=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  x[,1]=x0
+  y[,1]=y0
+  r[,1]=.03
+  
+  for(i in 2:(nstep+1)){
+    z1=rnorm(npath)
+    z2=rnorm(npath)
+    zz2=p*z1 + sqrt(1-(p^2))*z2
+    
+      x[,i]=x[,(i-1)]-(a*x[,(i-1)]*dt) + (sigma*sqrt(dt)*z1)
+      y[,i]=y[,(i-1)] - (b*y[,(i-1)]*dt) + (n*sqrt(dt)*zz2)
+      r[,i]=(x[,i]+y[,i] +phi_t)
+  }
+  R=dt*rowSums(r)
+  x_fin=x[,(nstep+1)]
+  y_fin=y[,(nstep+1)]
+  p=mean(exp(-R))
+  return (p)
+}
+
+g2_r<-function(p,a,b,sigma,x0,y0,n,phi_t,T){
+  nstep=180
+  dt=T/nstep
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  x=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  y=matrix(data=0,nrow=npath,ncol=(nstep+1))
+  x[,1]=x0
+  y[,1]=y0
+  r[,1]=.03
+  for(i in 2:(nstep+1)){
+    z1=rnorm(npath)
+    z2=rnorm(npath)
+    zz2=p*z1 + sqrt(1-(p^2))*z2
+    
+      x[,i]=x[,(i-1)]-(a*x[,(i-1)]*dt) + (sigma*sqrt(dt)*z1)
+      y[,i]=y[,(i-1)] - (b*y[,(i-1)]*dt) + (n*sqrt(dt)*zz2)
+      r[,i]=(x[,i]+y[,i] + phi_t)
+  }
+  R=dt*rowSums(r)
+  x_fin=x[,(nstep+1)]
+  y_fin=y[,(nstep+1)]
+  p=mean(exp(-R))
+  return (cbind(x_fin,y_fin,R))
+}
+```
+
+```{r g2_price, eval=TRUE}
+x0 = 0
+y0 = 0
+r0 = 0
+phi0 = 0
+p = 0.7
+a = 0.1
+b = 0.3
+sigma = 0.03
+n = 0.08
+phi_t = 0.03
+K = 950
+K1 = 0.95
+T = 0.5
+FV = 1000
+S = 1
+set.seed(2)
+ret=g2_r(p,a,b,sigma,x0,y0,n,phi_t,T)
+#ret
+price=vector(length = nrow(ret))
+for(i in 1:nrow(ret)){
+  price[i]=FV*g2(p,a,b,sigma,ret[i,1],ret[i,2],n,phi_t,T)
+}
+#price
+eu_put=mean(exp(-ret[,3])*pmax((K-(price)),0))
+put=matrix(nrow=2,ncol=1)
+put[1,1]=eu_put
+eu_put
+#plot(ret[,3])
+```
+
+```{r}
+V_tT = generateV(T, a,b, sigma,n,p)
+V_tS = generateV(S, a,b, sigma,n,p)
+
+P_tT = exp((-phi_t*T) - ((1- exp(-a*T))/a)*x0 - ((1- exp(-b*T))/b)*y0 + V_tT/2)
+P_tS = exp((-phi_t*S) - ((1- exp(-a*S))/a)*x0 - ((1- exp(-b*S))/b)*y0 + V_tS/2)
+
+SIGMA1 = ((sigma^2)*( (1- exp(-a*(S-T)))^2 )* (1 - exp(-2*a*T)))/(2*(a^3))
+SIGMA2 = ((n^2)*( (1- exp(-b*(S-T)))^2 )* (1 - exp(-2*b*T)))/(2*(b^3))
+SIGMA3 = (2*p*sigma*n*(1- exp(-a*(S-T)))*(1- exp(-b*(S-T)))*(1- exp(-T*(a+b))))/(a*b*(a+b))
+SIGMASQ = SIGMA1 + SIGMA2 + SIGMA3
+SIGMA = sqrt(SIGMASQ)
+
+d1 = (log((K1*P_tT)/(P_tS))/SIGMA) - SIGMA/2
+d2 = (log((K1*P_tT)/(P_tS))/SIGMA) + SIGMA/2
+
+L = 1000
+PtTSK = -L*P_tS*pnorm(d1) + P_tT*K*pnorm(d2)
+put[2,1]=PtTSK
+PtTSK
+kable(put)
+```
+
+As we can observe, both values are really close thus proving our Monte-carlo method good.

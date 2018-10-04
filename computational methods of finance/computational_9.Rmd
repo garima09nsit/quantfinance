@@ -1,0 +1,369 @@
+---
+title: "Computational 9"
+author: "Garima Agarwal"
+date: "June 4, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(OptionPricing)
+library(plyr)
+library(FinCal)
+```
+
+#1
+
+```{r numerix_function}
+A = function(h1,h2,h3,t){
+  ((h1*exp(h2*t))/(h2*(exp(h1*t)-1)+h1))**h3
+  }
+  B = function(h1,h2,h3,t){
+    (exp(h1*t)-1)/(h2*(exp(h1*t)-1)+h1)
+    }
+  P = function(h1,h2,h3,t,r){
+    A(h1,h2,h3,t)*exp(-B(h1,h2,h3,t)*r)
+    }
+  
+  CIR = function(r0,rbar,sigma,t,k){
+    h1 = sqrt(k**2+2*sigma**2)
+    h2 = (k+h1)/2
+    h3 = (2*k*rbar)/sigma**2
+    Pt = P(h1,h2,h3,t,r0)
+    rt = -1/t*log(Pt)
+    return(list("price" = Pt, "rate" = rt))
+  }
+cir<-function(r0, sigma, kappa, rbar, T,dt=.01){
+  n=T/dt
+  npath=500
+  r=matrix(data=0,nrow=npath,ncol=(n+1))
+  r[,1]=r0
+  
+  for(i in 2:(n+1)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt +sigma*sqrt(pmax(r[,(i-1)],0))*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1)]
+  P=mean(exp(-R))
+  return(P)
+}
+AB<-function(T, h1, h2, h3){
+    A = (h1*exp(h2*(T))/(h2*(exp(h1*(T))-1)+ h1))^h3
+    B = (exp(h1*(T))-1)/(h2*( exp(h1*(T)) - 1 ) + h1)
+    return(c(A,B))
+}
+closed<-function(r0,sigma,kappa, rbar,T, dt){
+  h1=sqrt((kappa^2) + 2*(sigma^2))
+  h2=(kappa + h1)/2
+  h3=(2*kappa*rbar)/(sigma^2)
+  ss=AB(T,h1,h2,h3)
+  a1=ss[1]
+  b1=ss[2]
+  prc_ts=a1*exp(-b1*(r0))
+  return(prc_ts)
+}
+numerix_oas<-function(r0, sigma, kappa, rbar, T,amt,wac,x=0,npath=1000){
+  sy=c(0.94,0.76,0.74,0.95,0.98,0.92,0.98,1.10,1.18,1.22,1.23,0.98)
+  sy=rep(sy,T)
+  sg=vector(length = T*12)
+  n=T*12
+  dt=T/n
+  t={1:(T*12)}
+  sg=pmin(t/30,1)
+  pv0=amt
+  
+  r=matrix(data=0,nrow=npath,ncol=(n+1+120))
+  r[,1]=r0
+  
+  for(i in 2:(n+1+120)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt + 
+      sigma*sqrt(pmax(r[,(i-1)],0))*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1+120)]
+  P=mean(exp(-R))
+  r10=matrix(data=0,nrow=npath,ncol=(n))
+  pv=matrix(data=0,nrow=npath,ncol=(n+1))
+  for(i in 1:(n)){
+    r10[,i]=CIR(r[,i],rbar,sigma,10,kappa)$rate
+  }
+  rate=wac/12
+  
+  ri=.28 +.14*atan(-8.57 + 430*(wac-r10))
+  pv=matrix(data=0,nrow=npath,ncol=(n))
+  ct=matrix(data=0,nrow=npath,ncol=(n))
+  ip=matrix(data=0,nrow=npath,ncol=(n))
+  tpp=matrix(data=0,nrow=npath,ncol=(n))
+  cpr=matrix(data=0,nrow=npath,ncol=n)
+  ct[,1]=amt*rate/(1-((1+rate)^(-n)))
+  dft=vector(length = n)
+  ip[,1]=amt*rate
+  tpp[,1]=ct[,1]-ip[,1]
+  periods=n
+  pv[,1]=amt-tpp[i,1]
+  mbs=vector(length = npath)
+  
+  dft=matrix(data=0,nrow=npath,ncol=n)
+  dft[,1]=closed(r[,2],sigma,kappa, rbar,1/12, dt=0.01)
+  for(j in 2:n){
+    bu=0.3 + 0.7*pv[,(j-1)]/amt
+    cpr[,j]=ri[,j]*bu*sg[j]*sy[j]
+    ct[,j]=pv[,(j-1)]*rate/(1-((1+rate)^(j-1-periods))) + 
+      (pv[,(j-1)] - pv[,(j-1)]*rate*((1/(1-((1+rate)^(j-1-periods))))-1))*
+      (1-((1-cpr[,j])^(1/12)))
+    
+    ip[,j]=pv[,(j-1)]*rate
+    
+    tpp[,j]=ct[,j]-ip[,j]
+    
+    pv[,j]=pv[,(j-1)]-tpp[,j]
+    dft[,j]=closed(r[,(j+1)]+x,sigma,kappa, rbar+x,j/12, dt=0.01)
+    
+  }
+  mbs=rowSums(dft*ct)
+  
+  
+  price=mean(mbs)
+  return(price)
+  
+}
+
+```
+
+#a)
+
+```{r numerix}
+wac=0.08
+amt=100000
+r0=0.078
+kappa=0.6
+rbar=0.08
+sigma=.12
+T=30
+price=numerix_oas(r0, sigma, kappa, rbar, T,amt,wac)
+cat("Price of numerix is ",price)
+```
+
+#b)
+
+```{r kappa_numerix, eval=TRUE}
+kappa={3:9}
+kappa=kappa/10
+kappa=as.matrix(kappa)
+price=apply(kappa,1,numerix_oas,r0=r0,sigma=sigma,rbar=rbar,T=T,amt=amt,wac=wac,npath=3000)
+prr=cbind(kappa,price)
+kable(prr)
+plot(kappa,price,type="l")
+```
+
+#c)
+
+```{r numerix_rbar,eval=TRUE}
+kappa=0.6
+rbar={3:9}
+rbar=rbar/100
+rbar=as.matrix(rbar)
+price=apply(rbar,1,numerix_oas,r0=r0,sigma=sigma,kappa=kappa,T=T,amt=amt,wac=wac,npath=3000)
+prr=cbind(rbar,price)
+kable(prr)
+plot(rbar,price,type="l")
+```
+
+#2
+
+```{r psa_function}
+psa<-function(r0, sigma, kappa, rbar, T,amt,wac){
+  n=T*12
+  dt=1/12
+  cpr=vector(length = (n))
+  
+  cpr[1:30]=0.002
+  cpr=cumsum(cpr)
+  t={1:360}
+  t=t*dt
+  t=as.matrix(t)
+  dft=apply(t,1,closed,sigma=sigma,kappa=kappa,rbar=rbar,r0=r0)
+  r=rate=wac/12
+  npath=2000
+  pv=matrix(data=0,nrow=1,ncol=(n))
+  ct=matrix(data=0,nrow=1,ncol=(n))
+  ip=matrix(data=0,nrow=1,ncol=(n))
+  tpp=matrix(data=0,nrow=1,ncol=(n))
+  pmtt=-pmt(rate,n,amt,0)
+  pv0=vector(length = (n+1))
+  ip0=vector(length = (n))
+  i=1
+  ct[,1]=amt*r/(1-((1+r)^(-n)))
+  ip[,1]=amt*rate
+  tpp[i,1]=ct[,1]-ip[,1]
+  pv[i,1]=amt-tpp[i,1]
+  periods=n
+  ct2=vector(length = n)
+  ct2[1]=ct[,1]
+      for(j in 2:(n)){
+        ct2[j]=pv[i,(j-1)]*rate/(1-((1+rate)^(j-1-periods))) + 
+          (pv[i,(j-1)] - pv[i,(j-1)]*rate*((1/(1-((1+rate)^(j-1-periods))))-1))*
+          (1-((1-cpr[j])^(1/12)))
+       ip[i,j]=pv[i,(j-1)]*r
+       
+       tpp[i,j]=ct2[j]-ip[i,j]
+       if(tpp[i,j]>=pv[i,(j-1)]){
+         tpp[i,j]=pv[i,(j-1)]
+       }
+       pv[i,j]=pv[i,(j-1)]-tpp[i,j]
+      }
+      price=sum(dft*ct2)
+      return (price)
+  
+}
+```
+
+#a
+
+```{r psa}
+wac=0.08
+amt=100000
+r0=0.078
+kappa=0.6
+rbar=0.08
+sigma=.12
+T=30
+
+price=psa(r0, sigma, kappa, rbar, T,amt,wac)
+cat("Price of mbs using PSA is ",price)
+```
+
+#b
+
+```{r psa_kappa}
+kappa={3:9}
+kappa=kappa/10
+kappa=as.matrix(kappa)
+price=apply(kappa,1,psa,r0=r0,sigma=sigma,rbar=rbar,T=T,amt=amt,wac=wac)
+prr=cbind(kappa,price)
+kable(prr)
+plot(kappa,price,type="l")
+```
+
+#3
+```{r}
+
+oas<-function(x){
+  sqrt(abs((numerix_oas(r0, sigma, kappa, rbar, T,amt,wac,x,npath=3000)^2)-p0^2))
+}
+```
+
+```{r OAS,warning=FALSE}
+y=5*1e-4
+wac=0.08
+amt=100000
+r0=0.078
+kappa=0.6
+rbar=0.08
+sigma=.12
+T=30
+p0=110000
+x=optimize(oas,c(-0.013,-0.010))$minimum
+
+cat("OAS value is ",(x)*10000," BPs")
+```
+
+#4
+```{r duration}
+#set.seed(3)
+#6,10,
+pminus=numerix_oas(r0, sigma, kappa, rbar, T,amt,wac,x-y,npath=20000)
+pplus=numerix_oas(r0, sigma, kappa, rbar, T,amt,wac,x+y,npath=20000)
+duration=(pminus-pplus)/(2*y*p0)
+convexity=(pplus+pminus-(2*p0))/(2*p0*(y^2))
+t<-cbind(duration,convexity)
+kable(t)
+```
+
+#5
+
+```{r}
+numerix_o<-function(r0, sigma, kappa, rbar, T,amt,wac,x=0,npath=1000){
+  sy=c(0.94,0.76,0.74,0.95,0.98,0.92,0.98,1.10,1.18,1.22,1.23,0.98)
+  sy=rep(sy,T)
+  sg=vector(length = T*12)
+  n=T*12
+  dt=T/n
+  t={1:(T*12)}
+  sg=pmin(t/30,1)
+  pv0=amt
+  
+  r=matrix(data=0,nrow=npath,ncol=(n+1+120))
+  r[,1]=r0
+  
+  for(i in 2:(n+1+120)){
+    r[,i]=r[,(i-1)] + kappa*(rbar-r[,(i-1)])*dt + 
+      sigma*sqrt(pmax(r[,(i-1)],0))*sqrt(dt)*rnorm(npath)
+    
+  }
+  R=dt*rowSums(r)
+  r_fin=r[,(n+1+120)]
+  P=mean(exp(-R))
+  r10=matrix(data=0,nrow=npath,ncol=(n))
+  pv=matrix(data=0,nrow=npath,ncol=(n+1))
+  for(i in 1:(n)){
+    r10[,i]=CIR(r[,i],rbar,sigma,10,kappa)$rate
+  }
+  rate=wac/12
+  
+  ri=.28 +.14*atan(-8.57 + 430*(wac-r10))
+  pv=matrix(data=0,nrow=npath,ncol=(n))
+  ct=matrix(data=0,nrow=npath,ncol=(n))
+  ip=matrix(data=0,nrow=npath,ncol=(n))
+  tpp=matrix(data=0,nrow=npath,ncol=(n))
+  cpr=matrix(data=0,nrow=npath,ncol=n)
+  ct[,1]=amt*rate/(1-((1+rate)^(-n)))
+  dft=vector(length = n)
+  ip[,1]=amt*rate
+  tpp[,1]=ct[,1]-ip[,1]
+  periods=n
+  pv[,1]=amt-tpp[i,1]
+  mbs=vector(length = npath)
+  
+  dft=matrix(data=0,nrow=npath,ncol=n)
+  dft[,1]=closed(r[,2],sigma,kappa, rbar,1/12, dt=0.01)
+  for(j in 2:n){
+    bu=0.3 + 0.7*pv[,(j-1)]/amt
+    cpr[,j]=ri[,j]*bu*sg[j]*sy[j]
+    ct[,j]=pv[,(j-1)]*rate/(1-((1+rate)^(j-1-periods))) + 
+      (pv[,(j-1)] - pv[,(j-1)]*rate*((1/(1-((1+rate)^(j-1-periods))))-1))*
+      (1-((1-cpr[,j])^(1/12)))
+    
+    ip[,j]=pv[,(j-1)]*rate
+    
+    tpp[,j]=ct[,j]-ip[,j]
+    
+    pv[,j]=pv[,(j-1)]-tpp[,j]
+    dft[,j]=closed(r[,(j+1)]+x,sigma,kappa, rbar+x,j/12, dt=0.01)
+    
+  }
+  mbs=rowSums(dft*ct)
+  io=rowSums(dft*ip)
+  po=rowSums(dft*tpp)
+  
+  price=mean(mbs)
+  return(c(mean(po),mean(io)))
+  
+}
+```
+```{r PO_IO}
+kappa=0.6
+rbar={3:9}
+rbar=rbar/100
+rbar=as.matrix(rbar)
+price=apply(rbar,1,numerix_o,r0=r0,sigma=sigma,kappa=kappa,T=T,amt=amt,wac=wac)
+io=price[2,]
+plot(rbar,price[1,],col="Red",ylim=c(20000,90000),type="l")
+par(new=TRUE)
+plot(rbar,io,col="blue",ylim=c(20000,90000),type="l")
+kable(price)
+
+```

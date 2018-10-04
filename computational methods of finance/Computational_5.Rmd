@@ -1,0 +1,331 @@
+---
+title: "Computational_4"
+author: "Garima Agarwal"
+date: "May 10, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(OptionPricing)
+library(plyr)
+
+lgm<-function(n){
+  m = (2^31) - 1
+  a = (7^5)
+  x=vector(length = (n+1))
+  u=vector(length = n)
+  x[1]=as.numeric(Sys.time())
+  for(i in 2:(n+1))
+  {
+    x[i] = (a*x[i - 1])%%m
+    u[i-1] = (x[i]+0.5)/(m)
+  }
+  
+  return (u)
+}
+box<-function(u1,u2){
+  z1=((-2*log(u1))^(1/2))*cos(2*pi*u2)
+  z2=((-2*log(u1))^(1/2))*sin(2*pi*u2)
+  return(z1)
+}
+```
+
+
+Functions
+```{r Function_LSMC}
+lsmc<-function(s0,r,n,h,sigma,nstep,t,k,x,method){
+  stock=matrix(data=1,nrow=(nstep),ncol=(n+1))
+  stock[,1]=s0
+  z1=matrix(nrow=(nstep/2),ncol=n)
+  for(i in 1:(nstep/2)){
+    z1[i,]=box(lgm(n),lgm(n))
+    stock[i,2:(n+1)]=exp((r-sigma^2)*h + sigma*sqrt(h)*z1[i,])
+    
+    stock[i,]=cumprod(stock[i,])
+  }
+  for(i in ((nstep/2)+1):(nstep)){
+    
+    stock[i,2:(n+1)]=exp((r-sigma^2)*h + sigma*sqrt(h)*(-z1[(i-(nstep/2)),]))
+    stock[i,]=cumprod(stock[i,])
+  }
+  
+  discount=vector(length = n)
+  for(i in 1:n){
+    discount[i]=exp(-r*(h*i))
+  }
+  exercise=pmax((x-stock[,2:(n+1)]),0)
+  
+  option=matrix(data=0,nrow=nstep,ncol=n)
+  option[,n]=exercise[,n]
+  ind=matrix(data=0,nrow=nstep,ncol=n)
+  ind[(exercise[,n]>0),n]=1
+  continuation=matrix(data=0,nrow=nstep,ncol=n)
+  for(j in n:2){
+    y_vector=matrix(data=0,nrow=nstep,ncol=1)
+    l_mat=matrix(data=0,nrow=nstep,ncol=k)
+    for(i in j:n){
+      y_vector=y_vector+ind[,i]*exercise[,i]*exp(-r*h*(j-i))
+    }
+    #L_mat for Hermite
+    if(method==1){
+    if(k==2){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=2*stock[,j]
+    }
+    if(k==3){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=2*stock[,j]
+      l_mat[,3]=(4*(stock[,j]^2))-2
+    }
+    if(k==4){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=2*stock[,j]
+      l_mat[,3]=(4*(stock[,j]^2))-2
+      l_mat[,4]=(8*(stock[,j]^3))-(12* stock[,j])
+    }
+    }
+    #L_mat for Laguerre
+    if(method==2){
+    if(k==2){
+      l_mat[,1]=(exp(-stock[,(j+1)]/2))
+      l_mat[,2]=(exp(-stock[,(j+1)]/2)*(1-stock[,(j+1)]))
+    }
+    if(k==3){
+      l_mat[,1]=(exp(-stock[,(j+1)]/2))
+      l_mat[,2]=(exp(-stock[,(j+1)]/2)*(1-stock[,(j+1)]))
+      l_mat[,3]=(exp(-stock[,(j+1)]/2)*(1-2*stock[,(j+1)]+((stock[,(j+1)]^2)/2)))
+    }
+    if(k==4){
+      l_mat[,1]=(exp(-stock[,(j+1)]/2))
+      l_mat[,2]=(exp(-stock[,(j+1)]/2)*(1-stock[,(j+1)]))
+      l_mat[,3]=(exp(-stock[,(j+1)]/2)*(1-2*stock[,(j+1)]+((stock[,(j+1)]^2)/2)))
+      l_mat[,4]=(exp(-stock[,(j+1)]/2)*(1-3*stock[,(j+1)]+
+                                          (3*(stock[,(j+1)]^2)/2)-((stock[,(j+1)]^3)/6)))
+    }      
+    }
+    #L_mat for Monomial
+    if(method==3){
+    if(k==2){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=2*stock[,j]
+    }
+    if(k==3){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=stock[,j]
+      l_mat[,3]=stock[,j]^2
+    }
+    if(k==4){
+      l_mat[,1]=rep(1,times=nstep)
+      l_mat[,2]=2*stock[,j]
+      l_mat[,3]=stock[,j]^2
+      l_mat[,4]=stock[,j]^3
+    }
+    }
+    A=t(t(l_mat)%*%l_mat)
+    b=t(l_mat)%*%y_vector
+ #   a=chol2inv(chol(A))%*%(b)
+    a=lm(b~A+0)$coef
+    a[is.na(a)]<-0
+    a=as.matrix(a)
+    continuation[,j]=l_mat%*%a
+    for(i in 1:nstep){
+      if(exercise[i,j]>continuation[i,j]){
+        ind[i,j]=1
+        if(j<n){
+          ind[i,((j+1):n)]=0
+        }
+      }
+    }
+  }
+  discount_factor=matrix(data=0,nrow=nstep,ncol=n)
+  for(i in 1:nstep){
+    discount_factor[i,]=discount
+  }
+  option = (ind*(discount_factor))*(exercise)
+  return(sum(option)/nstep)
+}
+```
+
+#1
+#a)
+```{r Laguerre}
+sigma=.2
+r=0.06
+s0=40
+x=40
+n=20
+nstep=100000
+t=c(.5,1,2)
+s0=c(36,40,44)
+k=c(2,3,4)
+option_36=matrix(data=0,nrow=length(t),ncol=length(k))
+option_40=matrix(data=0,nrow=length(t),ncol=length(k))
+option_44=matrix(data=0,nrow=length(t),ncol=length(k))
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_36[i,j]=lsmc(s0[1],r,n,h,sigma,nstep,t[i],k[j],x,2)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_40[i,j]=lsmc(s0[2],r,n,h,sigma,nstep,t[i],k[j],x,2)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_44[i,j]=lsmc(s0[3],r,n,h,sigma,nstep,t[i],k[j],x,2)
+}
+}
+rownames(option_36)<-c("Time=.5","Time=1","Time=2")
+rownames(option_40)<-c("Time=.5","Time=1","Time=2")
+rownames(option_44)<-c("Time=.5","Time=1","Time=2")
+colnames(option_36)<-c("k=2","k=3","k=4")
+colnames(option_40)<-c("k=2","k=3","k=4")
+colnames(option_44)<-c("k=2","k=3","k=4")
+kable(option_36,caption="For stock price 36")
+kable(option_40,caption="For stock price 40")
+kable(option_44,caption="For stock price 44")
+
+```
+
+#b)
+
+```{r Hermite}
+option_36=matrix(data=0,nrow=length(t),ncol=length(k))
+option_40=matrix(data=0,nrow=length(t),ncol=length(k))
+option_44=matrix(data=0,nrow=length(t),ncol=length(k))
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_36[i,j]=lsmc(s0[1],r,n,h,sigma,nstep,t[i],k[j],x,1)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_40[i,j]=lsmc(s0[2],r,n,h,sigma,nstep,t[i],k[j],x,1)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_44[i,j]=lsmc(s0[3],r,n,h,sigma,nstep,t[i],k[j],x,1)
+}
+}
+rownames(option_36)<-c("Time=.5","Time=1","Time=2")
+rownames(option_40)<-c("Time=.5","Time=1","Time=2")
+rownames(option_44)<-c("Time=.5","Time=1","Time=2")
+colnames(option_36)<-c("k=2","k=3","k=4")
+colnames(option_40)<-c("k=2","k=3","k=4")
+colnames(option_44)<-c("k=2","k=3","k=4")
+kable(option_36,caption="For stock price 36")
+kable(option_40,caption="For stock price 40")
+kable(option_44,caption="For stock price 44")
+```
+
+#c)
+
+```{r Monomials}
+option_36=matrix(data=0,nrow=length(t),ncol=length(k))
+option_40=matrix(data=0,nrow=length(t),ncol=length(k))
+option_44=matrix(data=0,nrow=length(t),ncol=length(k))
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_36[i,j]=lsmc(s0[1],r,n,h,sigma,nstep,t[i],k[j],x,3)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_40[i,j]=lsmc(s0[2],r,n,h,sigma,nstep,t[i],k[j],x,3)
+}
+}
+for(j in 1:3){
+for(i in 1:3){
+  h=t[i]/n
+  option_44[i,j]=lsmc(s0[3],r,n,h,sigma,nstep,t[i],k[j],x,3)
+}
+}
+rownames(option_36)<-c("Time=.5","Time=1","Time=2")
+rownames(option_40)<-c("Time=.5","Time=1","Time=2")
+rownames(option_44)<-c("Time=.5","Time=1","Time=2")
+colnames(option_36)<-c("k=2","k=3","k=4")
+colnames(option_40)<-c("k=2","k=3","k=4")
+colnames(option_44)<-c("k=2","k=3","k=4")
+kable(option_36,caption="For stock price 36")
+kable(option_40,caption="For stock price 40")
+kable(option_44,caption="For stock price 44")
+```
+
+#d)
+
+As we can observe, for small values of k, i.e. with less polynomials to predict the values between the 3 methods fluctuate, but as we go closer to using k=4 polynomials the values converge to the the same number pointing it out that using more polynomials lead to better prediction results.
+
+We can clearly see the regular patern of put where the Stock price is In the Money has higher price whereas the stock which is out-of-the-money has lower prices in general.
+Also we see that with increase in time, our option prices increasing to accomodate for the chances of a stock getting in the money along the path.
+
+
+#2
+
+#a)
+```{r forwardput}
+forwardput<-function(s0,r,n,h,sigma,nstep,t,T){
+  t=t*n + 1
+  stock=matrix(data=1,nrow=(nstep),ncol=(n+1))
+  stock[,1]=s0
+  z1=matrix(nrow=(nstep/2),ncol=n)
+  for(i in 1:(nstep/2)){
+    z1[i,]=box(lgm(n),lgm(n))
+    stock[i,2:(n+1)]=exp((r-sigma^2)*h + sigma*sqrt(h)*z1[i,])
+    
+    stock[i,]=cumprod(stock[i,])
+  }
+  for(i in ((nstep/2)+1):(nstep)){
+    
+    stock[i,2:(n+1)]=exp((r-sigma^2)*h + sigma*sqrt(h)*(-z1[(i-(nstep/2)),]))
+    stock[i,]=cumprod(stock[i,])
+  }
+  payoff=pmax((stock[,t]-stock[,(n+1)]),0)
+  pay=exp(-r*T)*mean(payoff)
+  return(pay)
+}
+s0=65
+x=60
+sigma=.2
+r=0.06
+t1=0.2
+T=1
+n=100
+h=T/n
+nstep=500
+
+
+forward=forwardput(s0,r,n,h,sigma,nstep,t1,T)
+forward
+```
+
+#b)
+
+```{r}
+nstep=100
+st=s0*(exp((r-((sigma^2)/2))*t1 + sigma*sqrt(t1)*box(lgm(nstep),lgm(nstep))))
+s0_new=mean(st)
+t_new=T-t1
+price=vector(length = nstep)
+h=t_new/n
+n_new=20
+for(i in 1:nstep){
+  price[i]=lsmc(st[i],r,n,h,sigma,n_new,t_new,4,st[i],3)
+}
+pr=exp(-r*t1)*mean(price)
+t<-c(forward,pr)
+t=as.matrix(t)
+rownames(t)<-c("European Forward Put","American Forward Put")
+kable(t)
+```

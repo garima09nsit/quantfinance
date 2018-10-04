@@ -1,0 +1,174 @@
+---
+header-includes:
+- \usepackage{amssymb, amsmath, amsthm}
+- \usepackage{tabu}
+- \newcommand{\E}{\mathbb{E}}
+- \newcommand{\var}{{\rm Var}}?
+- \newcommand{\N}{\mathcal{N}}
+output:
+  pdf_document: null
+  html_document: default
+---
+
+\noindent \begin{tabu} to \textwidth {@{}X[4 l] @{}X[r]}
+  \textbf{Submission : Problem Set 1}           & \\ 
+  \textbf{Mgmt 237Q: Econometrics} & \\ 
+    \textbf{Professor Rossi}         & 
+\end{tabu}
+
+This is designed to review material on summation symbols, correlation, covariance, and least squares.
+
+## Question 1
+
+Review the basics of summation notation and covariance formulas. Show that:
+
+a. $\sum_{i=1}^N (Y_i - \bar{Y}) = 0$
+b. $\sum_{i=1}^N (X_i - \bar{X})(Y_i - \bar{Y}) = \sum_{i=1}^N (X_i - \bar{X})Y_i$
+
+##Answers :
+
+a. $\sum_{i=1}^N (Y_i - \bar{Y})$= $\sum_{i=1}^N (Y_i)$ - $\sum_{i=1}^N (\bar{Y})$
+
+   = $\sum_{i=1}^N (Y_i) - n(\bar{Y})$ (Since $\bar{Y}$ is a constant)   ----[1]
+   
+   We already know the way to calculate $\bar{Y}$ is 
+   $\bar{Y} = \sum_{i=1}^N (Y_i)/n$
+   
+   $n\bar{Y}=\sum_{i=1}^N (Y_i)$     -----[2]
+   
+   Hence putting equation [2] in [1], we get
+   
+   $\sum_{i=1}^N (Y_i) - n(\bar{Y})$ = $\sum_{i=1}^N (Y_i)$ - $\sum_{i=1}^N (Y_i)$
+   =0       -----[3]
+   
+   Hence, $\sum_{i=1}^N (Y_i - \bar{Y}) = 0$
+
+b. $\sum_{i=1}^N (X_i - \bar{X})(Y_i - \bar{Y})$ = $\sum_{i=1}^N (X_i - \bar{X})Y_i$ -         $\sum_{i=1}^N (X_i - \bar{X})\bar{Y}$ = $\sum_{i=1}^N (X_i - \bar{X})Y_i$ -                 $\bar{Y}\sum_{i=1}^N (X_i - \bar{X})$
+
+   From equation [3] we can tell that $\sum_{i=1}^N (X_i - \bar{X})$ = 0  -----[4]
+   
+   $\sum_{i=1}^N (X_i - \bar{X})Y_i$ - $\bar{Y}\sum_{i=1}^N (X_i - \bar{X})$ = $\sum_{i=1}^N (X_i - \bar{X})Y_i$ - $\bar{X}(0)$ = $\sum_{i=1}^N (X_i - \bar{X})Y_i$
+   
+   Hence,
+   $\sum_{i=1}^N (X_i - \bar{X})(Y_i - \bar{Y}) = \sum_{i=1}^N (X_i - \bar{X})Y_i$
+
+## Question 2
+
+What is the difference between the expectation of a random variable and the sample average?
+
+##Answer:
+A set of random variable basically includes the entire population available. Expected value thus defines the absolute mean value where the $\sum_{i=1}^N (Y_i - E[Y]) = 0$ where E[Y] is a representation of excepted value of the model. A sample is taking out few of the results from the population, hoping that it gives a rough representation of the set. Hence, sample average is just an estimation of population mean by calculating the mean for just the sample taken. The aim for this is to make $average$ $mean$ ->(tending to) $expection$ as close as possible which be achieved by increasing sample size to almost the polulation. 
+One other thing 
+
+## Question 3
+
+Review the normal distribution and the mean and variance of a linear combination of two normally distributed random variables. Let $X \sim N(1,2)$ and $Y \sim N(2,3)$. Note that the second parameter is variance. $X$ and $Y$ are independent. Compute:
+
+a. $E[3X]$
+b. $var(3X)$
+c. $var(2X-2Y)$ and $var(2X+2Y)$
+d. Explain why in part (c) you get the same answer no matter whether you add or subtract
+
+##Answer:
+
+ $X \sim N(1,2)$ implies $E[X] = 1$ and $Var(X) = 2$
+
+a. $E[3X]$ = $3*E[X]$ = $3*1$ = $3$
+b. $var(3X)$ = $3*3*var(X)$ = $9*var(X)$=$9*2$= $18$
+c and d. $var(2X-2Y) = var(2*(X-Y)) = 4*var(X) + 4*var(Y) - 2cov(X,Y)$
+
+$var(2X+2Y) = var(2*(X-Y)) = 4*var(X) + 4*var(Y) + 2cov(X,Y)$
+
+since X and Y are individual normal functions without any reliance on each other, there is no depency of the variables on each other.
+
+That implies $cov(X,Y)=0$
+
+By substituting this in the 2 equations, we get
+ $var(2X-2Y)  = 4*var(X) + 4*var(Y) - 0$
+ $var(2X+2Y)  = 4*var(X) + 4*var(Y) + 0$
+ hence
+ $var(2X-2Y)=var(2X+2Y)= 4*var(X) + 4*var(Y) = 4*2 +4*3 = 20$
+
+## Question 4
+
+a. From the Vanguard dataset, compute the standard error of the mean for the `VFIAX` index fund return.
+b.  For this fund, the mean and the standard error of the mean are almost exactly the same. Why is this a problem for a financial analyst who wants to assess the performance of this fund?
+c.  Calculate the size of the sample which would be required to reduce the standard error of the mean to 1/10th of the size of the mean return.
+
+##Answer:
+
+a.
+```{r }
+
+
+library(DataAnalytics)
+library(reshape2)
+data(Vanguard)
+Van=Vanguard[,c(1,2,5)]   # grab relevant cols
+V_reshaped=dcast(Van,date~ticker,value.var="mret")
+
+#
+# now let's plot mean std deviation.
+#
+mat=descStat(V_reshaped)
+mean=mat[2,1]
+se=mat[2,5]
+##Mean of VFIAX
+print (mean)
+##Standard Error of VFIAX
+print (se)
+```
+Hence $MEAN = SE$
+
+b. We can see that Mean and Standard Error are both exactly same as 0.04 which means that the deviation in values is a lot. Usually 95% values stay between $-2\sigma$ and $2\sigma$ which is this case lie -between -0.04 to 0.12 which is is a very big range of values with repect to the mean. This implies that our calculation for the value has a good chance of faultering and hence the error in prediction is huge and we cant trust our prediction. This implies that our prediction cant be trusted
+
+c. To decrease the error to 1/10th of the value, we need to follow the formula
+$\sigma=\sqrt(\sum_{i=1}^N (X_i - \bar{X})/N)$
+
+Meaning sigma is inversely propotional to square root of N(sample size).
+So by increasing sample size by 100, we can reduce the standard error to 1/10th.
+Sample size currently is 151.
+So the updated Sample size for 1/10th error is 151*10=1510 sample size.
+
+
+## Question 5
+
+Plot the `VFIAX` index fund return against the `ewretd` (equal-weighted market return) and add the fitted regression line to the plot.
+
+##Answer:
+``` {r}
+data(marketRf)
+Van_mkt=merge(V_reshaped,marketRf,by="date")
+with(Van_mkt,
+             plot(ewretd,VFIAX,pch=20,col="blue",xlab="ewretd",ylab="VFIAX") 
+       )
+
+
+
+
+out=lm(VFIAX~ewretd,data=Van_mkt)
+abline(out$coef,col="red",lwd=2)
+with(Van_mkt,
+     points(mean(ewretd),mean(VFIAX),pch=200,cex=2,col="green") )
+```
+
+## Question 6
+
+The normal distribution is often said to have "thin tails" relative to other distributions like the $t$-distribution. Use random number generation in R to illustrate why a $N(0,1)$ distribution has much thinner tails than a $t$-distribution with 5 degrees of freedom. (Note that `rnorm()` and `rt()` are the functions in R to draw from a normal distribution and a $t$-distribution.)
+
+##Answer:
+```{r}
+x<-rnorm(10000)  #random normal variable
+y<-dnorm(x)      #probability distribution of normal variable
+r<- rt(10000,5)  #radom t-distribution
+s<- dt(r,5)      #probability function for t-distribution
+plot(x,y, xlim=c(-5,5), ylim=range(c(0,.4)), col="blue",xlab="x",ylab="distribution")
+par(new = TRUE)
+plot(r,s,xlim=c(-5,5), ylim=range(c(0,.4)),col="red",xlab="x",ylab="distribution")
+```
+
+The Red curve represents rt() while the Blue curve represents rnorm() functions. As we can see t-distribution has fatter tails than normal distribution as seen near -2 and 2. As we keep on increasing the degree of freedom t-distribution moves closer to normal function and with very high degree of freedom it tends to normal distribution.
+
+
+
+

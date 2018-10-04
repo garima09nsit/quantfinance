@@ -1,0 +1,373 @@
+---
+title: "Computational Methods in Finance"
+subtitle: "Homework 2"
+author:
+  - "Garima Agarwal"
+output: pdf_document
+header-includes:
+   - \usepackage{amssymb, amsmath, amsthm}
+   - \usepackage{tabu}
+   - \newcommand{\E}{\mathbb{E}}
+   - \newcommand{\var}{{\rm Var}}
+   - \newcommand{\N}{\mathcal{N}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(OptionPricing)
+```
+
+#1
+```{r}
+lgm<-function(n){
+  m = (2^31) - 1
+  a = (7^5)
+  x=vector(length = (n+1))
+  u=vector(length = n)
+  x[1]=as.numeric(Sys.time())
+  for(i in 2:(n+1))
+  {
+    x[i] = (a*x[i - 1])%%m
+    u[i-1] = (x[i]+0.5)/(m)
+  }
+  
+  return (u)
+}
+box<-function(u1,u2){
+  z1=((-2*log(u1))^(1/2))*cos(2*pi*u2)
+  z2=((-2*log(u1))^(1/2))*sin(2*pi*u2)
+  return(z1)
+}
+
+
+set.seed('0')
+n=1000
+a=-0.7
+  
+u=lgm(2*n)
+u1=u[1:n]
+u2=u[(n+1):(2*n)]
+
+z1=((-2*log(u1))^(1/2))*cos(2*pi*u2)
+z2=((-2*log(u1))^(1/2))*sin(2*pi*u2)
+for(i in 1:n)
+{
+  if((z1[i]==Inf) | (z1[i]==(-Inf))){
+    z1[i]=0
+  }
+  if((z2[i]==Inf) | (z2[i]==-Inf)){
+    z2[i]=0
+  }
+}
+x1=z1
+y1=a*z1 +(sqrt(1-a^2))*z2
+
+mean_x1=mean(x1)
+mean_y1=mean(y1)
+sum=0
+var_x=0
+var_y=0
+
+  sum=sum((x1-mean_x1)*(y1-mean_y1))
+  var_x=sum((x1-mean_x1)^2)
+  var_y=sum((y1-mean_y1)^2)
+
+num=sum/(length(x1)-1)
+den=sqrt(var_x/(length(x1)-1))*sqrt(var_y/(length(y1)-1))
+
+rho=num/den
+```
+The value of correlation is coming out to be `r round(rho,4)`
+
+#2
+
+```{r}
+a=0.6
+x=z1
+y=a*z1 +(sqrt(1-a^2))*z2
+
+z= x^3 + sin(y) + (x^2)*y
+payoff=vector(length = length(z))
+for(i in 1:length(z))
+{
+payoff[i]=max(0,z[i])
+}
+expected_value=mean(payoff)
+```
+The Expected value of payoff is `r round(expected_value,4)`
+
+#3
+
+Considering that we can state the following
+
+$$
+\begin{aligned}
+W_{T} &\sim N\left(0,T\right)\\
+W_{T}&\,{\buildrel d \over =}\ \sqrt{T}Z
+\end{aligned}
+$$
+#a
+```{r}
+# for wt as standard weiner process
+u=lgm(n)
+t=c(0.5,3.2,6.5)
+w_5=sqrt(5)*box(u1,u2)
+a1=w_5^2 + sin(w_5)
+expected_a1=mean(a1)
+sd_a1=sd(a1)/(sqrt(n))
+a2=matrix(data=NA,nrow=3,ncol=n)
+expected_a2=vector(length = 3)
+for(i in 1:3){
+  w_t=sqrt(t[i])*box(u1,u2)
+  a2[i,]=exp(t[i]/2)*cos(w_t)
+ expected_a2[i] =mean(a2[i,])
+ 
+}
+table=c(expected_a1,expected_a2[1],expected_a2[2],expected_a2[3]*2)
+table=as.matrix(table)
+rownames(table)<-c("Ea1","Ea2","Ea3","Ea4")
+kable(table)
+```
+
+#b
+
+Irrespective of the Value of time duration(t) the vlue of integral is pretty close to 1.
+
+#c
+
+```{r}
+#variance control for 1st equation
+w_5_2=sqrt(5)*(box(1-u1,1-u2))
+a1_2=w_5_2^2 + sin(w_5_2)
+expected_a1_2=mean(a1_2)
+sd_a1_2=sd(a1_2)/(sqrt(n))
+a=(a1+a1_2)/2
+expected_a=mean(a)
+sd_a=sd(a)/sqrt(n)
+
+```
+```{r}
+#Variance control for 2nd equation
+b=matrix(data=NA,nrow=3,ncol=n)
+a2_2=matrix(data=NA,nrow=3,ncol=n)
+expected_a2_2=vector(length = 3)
+expected_b=vector(length = 3)
+for(i in 1:3){
+  w_t=sqrt(t[i])*(box(1-u1,1-u2))
+  a2_2[i,]=exp(t[i]/2)*cos(w_t)
+  expected_a2_2[i] =mean(a2_2[i,])
+  b[i,]=(a2[i,]+a2_2[i,])/2
+  expected_b[i]=mean(b[i,])
+  
+}
+table=c(expected_a,expected_b)
+table=as.matrix(table)
+rownames(table)<-c("Eb1","Eb2","Eb3","Eb4")
+kable(table)
+standard=matrix(data=0,nrow=4,ncol=2)
+standard[1,1]=sd_a1
+standard[1,2]=sd_a
+for(i in 1:3)
+{
+  standard[(i+1),1]=sd(a2[i,])
+  standard[(i+1),2]=sd(b[i,])
+}
+rownames(standard)<-c("SDa1","SDa2","SDa3","SDa4")
+colnames(standard)<-c("Standard Deviation","SD with Antithetic Variates")
+kable(standard,caption="Standard devation without and with variance redustion")
+
+```
+
+As we can see the Standard deviation is decreasing when we use Variance reduction with similar expected values.
+This helps us pin point values of the equation in lesser range to get to a closer exact value.
+
+
+#4
+
+#a
+
+```{r}
+s0=88
+r=0.04
+sigma=0.2
+X=100
+T=5
+st=s0*exp((r-(sigma^2))*T + sigma*sqrt(T)*z2)
+payoff=vector(length = length(st))
+for(i in 1:length(st))
+{
+  payoff[i]=max(0,(st[i]-X))
+}
+c=exp(-r*T)*mean(payoff)
+sd_c=sd(payoff)
+```
+Value of call option is `r c`
+
+#b
+
+```{r}
+cat("Black scholes price for the call option is ")
+BS_EC(T=5,K=100,r=0.04,sigma=0.2,S0=88)
+```
+```{r}
+st=s0*exp((r-(sigma^2))*T + sigma*sqrt(T)*(-z2))
+payoff_c=vector(length = length(st))
+for(i in 1:length(st))
+{
+  payoff_c[i]=max(0,(st[i]-X))
+}
+pay=(payoff_c+payoff)/2
+sd_call=sd(pay)
+call=exp(-r*T)*mean(pay)
+sd_pay=c(sd_c,sd_call)
+sd_pay=as.matrix(sd_pay)
+rownames(sd_pay)=c("SD without Variance Reduction","SD with Variance Reduction")
+kable(sd_pay)
+```
+
+Expected Value of call price with reduction is `r call`
+
+As we can see, the standard devation has reduced when we used Antithetic Variates Reduction.
+
+#5
+
+#a
+```{r}
+s0=88
+r=0.04
+sigma=0.18
+X=100
+t=c(1,2,3,4,5,6,7,8,9,10)
+st=matrix(data=NA,nrow=length(t),ncol=1000)
+expected_st=vector(length = length(t))
+for(i in 1:length(t)){
+  st[i,]=s0*exp((r-(sigma^2))*t[i] + sigma*sqrt(t[i])*(box(lgm(1000),lgm(1000))))
+  expected_st[i]=mean(st[i,])
+}
+plot(t,expected_st,type="l")
+
+```
+
+#b
+
+```{r}
+st_1=matrix(data=NA,nrow=6,ncol=1000)
+
+for(k in 1:6){
+
+  h=10/1000
+  mean=s0*exp((r-(sigma^2))*10)
+  sig=sigma*sqrt(h)
+  x=mean*cumprod(exp((sigma*sqrt(h)*(box(lgm(1000),lgm(1000))))))
+  st_1[k,]= x
+}
+```
+
+#c
+
+```{r}
+plot(expected_st,col=1,ylim=c(min(st_1),max(st_1)),xlim=c(0,10),type="b",
+     pch=23,lwd=3,ylab="stock prices")
+for(i in 1:6){
+  par(new=TRUE)
+  plot(st_1[i,],col=(i+1),ylim=c(min(st_1),max(st_1)),xlim=c(0,1000),
+       type="l",ylab="stock prices")
+  
+}
+```
+#d
+
+```{r}
+sigma=0.35
+X=100
+t=c(1,2,3,4,5,6,7,8,9,10)
+st=matrix(data=NA,nrow=length(t),ncol=1000)
+expected_st_35=vector(length = length(t))
+for(i in 1:length(t)){
+  st[i,]=s0*exp((r-(sigma^2))*t[i] + sigma*sqrt(t[i])*(box(lgm(1000),lgm(1000))))
+  expected_st_35[i]=mean(st[i,])
+}
+plot(t,expected_st,ylim=c(30,172),type="l",col=2)
+par(new=TRUE)
+plot(t,expected_st_35,ylim=c(30,172),type="l",col=3)
+
+#6paths
+st_1=matrix(data=NA,nrow=6,ncol=1000)
+
+for(k in 1:6){
+  
+  h=10/1000
+  mean=s0*exp((r-(sigma^2))*10)
+  sig=sigma*sqrt(h)
+  x=mean*cumprod(exp((sigma*sqrt(h)*(box(lgm(1000),lgm(1000))))))
+  st_1[k,]= x
+}
+plot(expected_st_35,col=1,ylim=c(min(st_1),max(st_1)),xlim=c(0,10),type="b",
+     pch=23,lwd=3,ylab="stock prices")
+for(i in 1:6){
+  par(new=TRUE)
+  plot(st_1[i,],col=(i+1),ylim=c(min(st_1),max(st_1)),xlim=c(0,1000),
+       type="l",ylab="stock prices")
+  
+}
+```
+
+The slope of the expected line is lower than the one before, whilst the the prices move more violently given the increase in the diffusion of the process. Despite this changes, the new expected line is still similar to the old expected value of the black lines.
+
+#6
+
+#a
+
+```{r}
+h=1/1000
+y=0
+for(i in 1:1000){
+  y=y+(h)*sqrt(1-((h*i)^2))
+}
+pi=y*4
+```
+Usuing Eular's method, my pi values is `r pi`
+
+#b
+
+```{r}
+n=4*sqrt(1-lgm(1000)^2)
+expected_int=mean(n)
+var_int=var(n)
+```
+Using Monte Carlo my pi value is `r expected_int`
+ And my variance for pi is `r var_int`
+
+#c
+
+Our PDF and CDF for the IS method is given by:
+
+$$
+\begin{aligned}
+t(X) &=\begin{cases}
+\frac{4-2x}{3} & 0\leq x\leq1\\
+{\;\;\;0} & otherwise
+\end{cases}\\
+F(X)&=\frac{4x-x^2}{3}
+\end{aligned}
+$$
+yielding the inverse CDF
+
+$$
+\begin{aligned}
+F^{-1}(X) &=2-\sqrt{4-3X}
+\end{aligned}
+$$
+```{r}
+y=lgm(1000)
+g=sqrt(1-y^2)
+t=(1-0.74*(y^2))/(1-0.74/3)
+f=g/t
+pi_importance=sum(f[g<t])*4/1000
+var_importance=var(f[g<t])
+```
+Using Importance sampling my pi value is `r pi_importance`
+ And my variance for pi is `r var_importance`
+ 
+ As i can see the value is closer to actual pi value when we use importance sampling rather than just using plain Monte Carlo. Even my variance for importance is lower than that of monte carlos, implying that importance samling improves the results compared to monte carlo.

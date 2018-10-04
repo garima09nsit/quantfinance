@@ -1,0 +1,173 @@
+---
+graphics: yes
+header-includes:
+- \usepackage{tabu}
+- \usepackage{amssymb, amsmath, amsthm}
+- \usepackage{enumerate}
+- \renewcommand{\P}{\textrm{P}}
+- \newcommand{\R}{\mathbb{R}}
+- \newcommand{\E}{\mathbb{E}}
+- \newcommand{\var}{{\rm Var}}
+- \newcommand{\cov}{{\rm Cov}}
+- \newcommand{\iid}{\stackrel{iid}{\sim}}
+- \newcommand{\N}{\mathcal{N}}
+output: pdf_document
+---
+\noindent \begin{tabu} to \textwidth {@{}X[4 l] @{}X[r]}
+  \textbf{Problem Set 3} 	       & \\ 
+  \textbf{Mgmt 237Q: Econometrics} & \\ 
+  \textbf{Professor Rossi}		   & 
+\end{tabu}
+##Garima Agarwal
+
+This problem set is designed to review material on the multiple regression model and time series. Include both your R code and output in your answers.
+
+
+## Question 1
+
+Rerun the regression of `VWMNFX` on `vwretd`.
+
+a. Compute a 90\% prediction interval using the formulas in the class notes.
+b. Check your work in part (a) by computing a 90\% prediction interval using the R `predict` command for `vwretd` = 0.05.
+```{r}
+library(DataAnalytics)
+library(reshape2)
+data(Vanguard)
+Van=Vanguard[,c(1,2,5)]   # grab relevant cols
+V_reshaped=dcast(Van,date~ticker,value.var="mret")
+
+#
+# now let's plot mean std deviation.
+#
+mat=descStat(V_reshaped)
+data(marketRf)
+Van_mkt=merge(V_reshaped,marketRf,by="date")
+with(Van_mkt,
+             plot(vwretd,VWNFX,pch=20,col="blue",xlab="vwretd",ylab="VWNFX") 
+       )
+
+
+
+
+out=lm(VWNFX~vwretd,data=Van_mkt)
+abline(out$coef,col="red",lwd=2)
+with(Van_mkt,
+     points(mean(vwretd),mean(VWNFX),pch=200,cex=2,col="green") )
+summary(out)
+lmSumm(out)
+
+
+
+```
+Using the following formulae
+$$1. s_{pred} = s\times\sqrt{\left(1 + \frac{1}{N} + \frac{(X_f - \bar{X})^2}{(N-1)s_x^2}\right)}$$
+$$2. y_{upper} = b_0 + b_1X_{f} + t_{N-2,\alpha/2}s_{pred}$$
+$$3. y_{lower} = b_0 + b_1X_{f} - t_{N-2,\alpha/2}s_{pred}$$
+```{r}
+N <- length(Van_mkt$VWNFX[!is.na(Van_mkt$VWNFX)])
+see <- sqrt(sum(out$residuals^2)/(N-2))
+xf <- 0.05
+xbar <- mean(Van_mkt$vwretd,na.rm = "TRUE")
+sx <-  sd(Van_mkt$vwretd,na.rm = "TRUE")
+spred <-see*sqrt(1 + (1/N) + ((xf-xbar)^2/ ((N-1)*sx^2)) )
+tcrit <- qt(0.10/2,N-2)
+b0 <- out$coefficients[[1]]
+b1 <- out$coefficients[[2]]
+y_upper <- b0 + b1*xf + tcrit*spred
+y_lower <- b0 + b1*xf - tcrit*spred
+cat("The prediction interval for vwretd = 0.05 is",y_upper, "to", y_lower)
+
+p <- predict(out, new = data.frame(vwretd =0.05), int = "prediction", level =0.9)
+print(paste0("predicted value using predict is ",p[2]," to ",p[3]," with fitted value as ",p[1]))
+```
+
+## Question 2
+
+Using a sequence of simple regressions, show how to obtain the multiple regression coefficient on $P2$ in the multi dataset. 
+```{r}
+data(multi)
+out=lm(p2~p1,data=multi)
+e2.1=out$residuals
+out2=lm(Sales~e2.1,data=multi)
+coef_p2=out2$coefficients[2]
+print(paste0("Coefficient of p2 using simple regression is",coef_p2))
+
+# verifying with multiple regression
+out3=lm(Sales~p1+p2,data=multi)
+print (out3$coefficient[3])
+```
+as we can see, coefficient from multiple regression is same as the one we obtained using simple regression twice.
+
+## Question 3
+
+This question will ask you to use matrix formulas to compute the variance of a portfolio. Specifically, let:
+
+$$ \mu = \begin{bmatrix} 0.010 \\ 0.015 \\ 0.025 \end{bmatrix} \hspace{1em} \textrm{and} \hspace{1em} \Sigma = \begin{bmatrix} 0.0016 & 0.0010 & 0.0015 \\  & 0.0020 & 0.0019 \\  &  & 0.0042 \end{bmatrix} $$
+
+a. Compute the correlation matrix of these three assets from the variance-covariance matrix $\Sigma$. (Hint: you must divide the $(i,j)$ element of $\Sigma$ by $\sigma_i$ and $\sigma_j$.)
+b. Compute the mean and standard deviation of a portfolio made from these assets with weights $(0.3, 0.4, 0.3)$
+
+```{r}
+mu=matrix(c(.01,.015,.025),nrow=1)
+mu
+Covar=matrix(c(.0016,.001,.0015,.001,.002,.0019,.0015,.0019,.0042),nrow=3,ncol=3)
+Covar
+sigma = matrix(c(1/sqrt(Covar[1,1]),0,0,0,1/sqrt(Covar[2,2]),0,0,0, 1/sqrt(Covar[3,3])),ncol=3)
+correl = matrix(rep(NA,9), ncol = 3)
+correl = sigma%*%Covar%*%sigma
+cat("Correlation Matrix")
+correl
+
+
+wght = matrix(c(0.3, 0.4, 0.3),nrow=1)
+wght
+#Portfolio mean 
+meanport <- wght%*%t(mu)
+cat("Mean of portfolio is", meanport)
+
+PortfolioStddev <-sqrt(wght %*% Covar %*% t(wght))
+cat("Standard deviation of the portfolio is", PortfolioStddev) 
+```
+## Question 4
+
+Use matrix formulas to reproduce the least squares coefficients and standard errors shown on slide 17 of Chapter II.
+```{r}
+data("countryret")
+
+out <- with(countryret, lm(usa~canada+uk+australia+france+germany+japan))
+lmSumm(out)
+y =countryret$usa
+X =cbind(rep(1,length(y)),countryret$canada,countryret$uk,countryret$australia,countryret$france,countryret$germany,countryret$japan)
+
+lm(usa ~ canada+uk+australia+sweden+germany,data=countryret)
+#intercept
+b =chol2inv(chol(crossprod(X)))%*%crossprod(X,y)
+cat("Printing coefficients")
+row.names(b)= c("intercept","canada","uk","australia","france","germany","japan")
+b
+#stderror
+e = y- X%*%b
+ssq = sum(e*e)/(length(y)- ncol(X))
+Var_b = ssq*chol2inv(chol(crossprod(X)))
+std_err = sqrt(diag(Var_b))
+names(std_err)= c("intercept","canada","uk","australia","france","germany","japan")
+cat("Printing the standard error")
+std_err
+```
+
+## Question 5
+
+Retrieve the Apple stock price series using the `quantmod` package (as done in the notes). Compute the autocorrelation of the difference in log prices.
+
+```{r}
+library(quantmod)
+getSymbols('AAPL')
+y<-AAPL$AAPL.Close
+y1<-log(as.vector(y))
+y2<-back(y1)
+y3<-y1-y2
+ds=as.data.frame(c(y1,y2))
+lm(y1~y2)
+acf(na.omit(y3))[1]
+Box.test(y3,type="Ljung",lag=20)
+```

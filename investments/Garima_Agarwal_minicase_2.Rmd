@@ -1,0 +1,93 @@
+---
+title: "Garima_Agarwal_minicase2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+#1.	
+Compute the Betas for MSFT and GM (run the regressions using excess returns). Report the coefficients from your regressions with their standard errors.
+
+```{r}
+out=read.csv("Minicase2_data.csv")
+ms=out$MSFT-out$T.bill
+gmt=out$GM-out$T.bill
+sp=out$SP500-out$T.bill
+MSFT=lm(ms~sp,data=out)
+GM=lm(gmt~sp,data=out)
+beta_MSFT=MSFT$coef[2]
+beta_GM=GM$coefficients[2]
+cat("Beta for MSFT with respect tp SP500 is ",MSFT$coef[2]," with standard error as ",summary(MSFT)$coef[2,2])
+cat("Beta for GM with respect tp SP500 is ",GM$coef[2]," with standard error as ",summary(GM)$coef[2,2])
+mean(out$MSFT)
+mean(out$GM)
+
+```
+#2.	
+If the return on the S&P500 increases by 2% for the next month, by how much are the returns on MSFT and GM expected to increase (approximately)?
+```{r}
+cat("increase in MSFT with 2% or 0.02 increase in SP500",.02*beta_MSFT)
+cat("increase in GM with 2% or 0.02 increase in SP500",.02*beta_GM)
+```
+#3.	
+What are the expected returns for MSFT and GM as predicted by the CAPM pricing formula?  (Hint: you need to choose a risk-free rate and an expected market return.  Get these from the data.)  How do these compare to the historical sample average returns you calculated in question 1 of the previous case.
+```{r}
+rf=mean(out$T.bill)
+mkrt=mean(out$SP500)
+cat("expected rf is ",rf," expected market return is ",mkrt)
+msft_expected=rf +beta_MSFT*(mkrt-rf)
+gm_expected=rf+beta_GM*(mkrt-rf)
+cat("expected value of msft is ",msft_expected)
+cat("expected value of gm is",gm_expected)
+#compare it with the historical values in 1st question
+```
+The historical data matches closely with the CAPM calculations for the GM stock, which has very low $\alpha$. But the returns of CAPM calculations for the MSFT deviates highly. This implies that $\alpha$ is high for MSFT.
+
+#4.	
+Report the alphas for the two stocks with their standard errors.  Are the alphas statistically significant from zero?  What does it mean if they are?
+```{r}
+alpha_msft=MSFT$coefficients[1]
+alpha_gm=GM$coefficients[1]
+cat("alpha of MSFT is ",alpha_msft," with standard error as ",summary(MSFT)$coef[1,2])
+cat("alpha of GM is ",alpha_gm," with standard error as ",summary(GM)$coef[1,2])
+```
+alpha for MSFT is 1.9% with standard error of .73% while alpha for gm is -.1% with standard error of .66%.
+As we can see, positive alpha means that MSFT out-performed the expectation from the market data where as negetive signifies that it under-performed compared to expected value by our model. 
+The alpha for GM is only -.001 with standard erro of .0067 which will sway is closer or further from zero even positive occasionaly. This implies that General motors under-performed compared to our model but its pretty in-significant to the level.
+The alpha for MSFT is .019 with standard error .0073 which means that MSFT alpha is usually well above 0 thus emphasing that microsoft out-performed our expection for most parts. Since its pretty significant, we can say that model is under-appreciating the stock.
+
+#5.	
+Report the R-squared values for each regression. What fraction of each stock's total variance is systematic vs. idiosyncratic?
+```{r}
+r_squared_msft=summary(MSFT)$r.squared
+r_squared_gm=summary(GM)$r.squared
+fraction_msft_idio=(1-r_squared_msft)
+fraction__gm_idio=(1-r_squared_gm)
+fraction__gm_sys=r_squared_gm
+fraction_msft_sys=r_squared_msft
+cat("systematic risk ratio for msft is ",fraction_msft_sys," and idiosyncratic ratio is ",fraction_msft_idio)
+cat("systematic risk ratio for gm is ",fraction__gm_sys," and idiosyncratic ratio is ",fraction__gm_idio)
+systematic_msft_r=(anova(MSFT)[2,2]+ anova(MSFT)[1,2])*r_squared_msft/(154)
+systematic_gm_r=(anova(GM)[2,2]+ anova(GM)[1,2])*r_squared_gm/(154)
+cat("calculated systematic risk for msft is ",systematic_msft_r)
+cat("calculated systematic risk for gm is ",systematic_gm_r)
+
+```
+#6.	
+Use the formula: Systematic var = ???2var(RM) to compute the systematic variances for MSFT and GM and compare these to the systematic variances you found in question 5.  (RM means market return, thus you will need to compute the variance of 
+```{r}
+msft_systemetic=(beta_MSFT^2)*var(out$SP500)
+gm_systematic=(beta_GM^2)*var(out$SP500)
+cat("systematic return from formula for msft is",msft_systemetic)
+cat("systematic return for formula for gm is ",gm_systematic)
+```
+The systematic values for almost same in question 5 and 6 for us. This is because we calculated the variance on excess return which makes both answers equal.

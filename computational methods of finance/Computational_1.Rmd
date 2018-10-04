@@ -1,0 +1,256 @@
+---
+title: "Computation_Methods_1"
+author: "Garima Agarwal"
+date: "April 11, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Project 1
+MGMT 237G
+Instructor: L. Goukasian
+You will need to write codes for all the parts of the project. Make sure the codes work properly and understand the ideas behind each problem below. You may be asked to demonstrate how the codes work, by running them, and interpret the results. Code quality, speed, and accuracy will determine the grades.
+Due date: Next Wednesday
+
+1. Use the Random Number generators discussed in the class to do the following:
+
+(a) Using LGM method generate 10,000 Uniformly distributed random numbers on [0,1] and compute the empirical mean and the standard deviation of the sequence.
+
+```{r}
+n=10000
+lgm<-function(n){
+m = (2^31) - 1
+a = (7^5)
+x=vector(length = n)
+u=vector(length = n)
+x[1]=as.numeric(Sys.time())
+for(i in 2:n)
+{
+  x[i] = (a*x[i - 1])%%m
+  u[i] = (x[i]+0.5)/(m)
+}
+
+return (u)
+}
+u=lgm(10000)
+plot(u,xlab="Random variable")
+
+
+```
+
+Mean from my random variable function is `r mean(u)`
+
+Standard Deviation from my random variable function is `r sd(u)`
+
+(b) Now use built-in functions of whatever software you are using to do the same thing as in (a).
+```{r}
+
+u1=runif(n)
+
+```
+
+Mean from the built-in fucntion is `r mean(u1)`
+
+Standard Deviation from the built-in function is `r sd(u1)`
+
+(c) Compare your findings in (a) and (b) and comment (be short but precise).
+
+My value for mean and standard deviations are very close to 0.5 and 0.29 which are the approximate values given by the built-in function. This implies that my function is pretty close to the in-built mechanism R uses.
+
+2. Use the numbers of part (a) of question 1 to do the following:
+(a) Generate 10,000 random numbers with the following distribution:
+$$X\ =\begin{cases}
+-1 & with\;probability\;.30\\
+\;0 & with\;probability\;.35\\
+\;1 & with\;probability\;.20\\
+\;2 & with\;probability\;.15
+\end{cases}$$
+```{r}
+
+pro<-function(n){
+  u=lgm(n)
+  x=c(.3,.35,.2,.15)
+  y=cumsum(x)
+  z=vector(length = n)
+  for(i in 1:n){
+    if(u[i]<y[1]){
+      z[i]=-1
+    }else if(u[i]<y[2]){
+      z[i]=0
+    }else if(u[i]<y[3]){
+      z[i]=1
+    }else{
+      z[i]=2
+    }
+    
+    
+  }
+  return(z)
+  
+  
+}
+z=pro(10000)
+
+```
+
+(b) Draw the histogram and compute the empirical mean and the standard deviation of the sequence of 10,000 numbers generated above in part (a).
+
+```{r}
+hist(z)
+
+```
+
+Mean from my distribution function is `r mean(z)`
+
+Standard Deviation from my distribution function is `r sd(z)`
+
+3. Use the idea of part (a) of Question 1 to do the following:
+
+(a) Generate 1,000 random numbers with Binomial distribution with n=44 and p=.64. (Hint: A random variable with Binomial distribution (n,p) is a sum of n Bernoulli(p) distributed random variables, so you will need to generate 44,000 Uniformly distributed random numbers, to start with).
+
+```{r}
+binom<-function(n,p){
+  u=lgm(n*1000)
+  ber=matrix(data=NA,nrow=n,ncol=1000)
+  for(i in 1:n){
+    for(j in 1:1000){
+      if(u[((i-1)*1000)+j]<p){
+      ber[i,j]=1
+      }else{
+        ber[i,j]=0
+      }
+    }
+  }
+  bin=colSums(ber)
+  return(bin)
+  
+}
+
+
+b=binom(n=44,p=0.64)
+
+```
+
+(b) Draw the histogram. Compute the probability that the random variable X that has Binomial, is at least 40. Use any statistics textbook or online resources for the exact number for the above probability and compare it with your finding and comment.
+
+```{r}
+hist(b)
+prob=length(b[b>40])/length(b)
+#Using online tools it is .0000079508 which is almost close to 0
+```
+
+Probability of the binomial distribution being more than 40 is `r prob`.
+
+Using online tools it is .0000079508 which is almost close to 0. This makes sense as our binomial distribution is a sum of 44 bernoulli numbers. So its highly unlikely for it to reach 40 and beyond with only 44 numbers.
+
+4. Use the numbers of part (a) of question 1 to do the following:
+
+(a) Generate 10,000 Exponentially distributed random numbers with parameter $\lambda=1.5$
+```{r}
+expot<-function(n,lambda){
+  u=runif(n)
+  X_exp = -lambda*log(1-u);
+  return (X_exp)
+}
+x=expot(10000)
+
+```
+
+(b) Compute P(X>=1) and P(X>=4).
+
+```{r}
+prob_1=length(x[x>=1])/10000
+prob_4=length(x[x>=4])/10000
+```
+
+Probability of exponential distribution >=1 is `r prob_1`
+
+Probability of exponential distribution >=4 is `r prob_4`
+
+(c) Compute the empirical mean and the standard deviation of the sequence of 10,000 numbers
+generated above in part (a). Draw the histogram by using the 10,000 numbers of part (a).
+```{r}
+mean_exp=mean(x)
+sd_exp=sd(x)
+```
+Mean of exponential distribution is `r mean_exp`
+
+Standard Deviation of exponential function is `r sd_exp`
+
+```{r}
+hist(x)
+```
+5. Use the idea of part (a) of Question 1 to do the following:
+(a) Generate 5,000 Uniformly distributed random numbers on [0,1].
+```{r}
+u=lgm(10000)
+u1=u[1:5000]
+u2=u[5001:10000]
+```
+
+(b) Generate 5,000 Normally distributed random numbers with mean 0 and variance 1, by Box- Muller Method.
+```{r}
+box<-function(u1,u2){
+z1=((-2*log(u1))^(1/2))*cos(2*pi*u2)
+z2=((-2*log(u1))^(1/2))*sin(2*pi*u2)
+return(z1)
+}
+a=as.numeric(Sys.time())
+z1=box(u1,u2)
+b=as.numeric(Sys.time())
+plot(z1,dnorm(z1))
+z1[z1==-Inf]=0
+```
+(c) Compute the empirical mean and the standard deviation of the sequence of numbers generated above of part (b).
+```{r}
+z1[z1==-Inf]=0
+cat("Mean of Normal distribution with Box-Muller method is ",mean(z1))
+cat("Standard Deviation of Normal distribution with Box-Muller method is ",sd(z1))
+```
+
+
+(d) Now use the Polar-Marsaglia method to do the same as in (b).
+Note: Here you will not have the same number of random variables as in (b).
+```{r}
+polar<-function(u1,u2){
+v1=2*u1-1
+v2=2*u2-1
+w=v1^2 + v2^2
+k=1
+z1_1=vector(length = length(w[w<=1]))
+z2_2=vector(length = length(w[w<=1]))
+for(i in 1:5000){
+  if(w[i]<=1){
+    z1_1[k]=v1[i]*((-2*(log(w[i]))/w[i])^(1/2))
+    z2_2[k]=v2[i]*((-2*(log(w[i]))/w[i])^(1/2))
+    k=k+1
+  }
+}
+return (z1_1)
+}
+a2=as.numeric(Sys.time())
+z2=polar(u1,u2)
+b2=as.numeric(Sys.time())
+plot(z2,dnorm(z2))
+```
+(e) Compute the empirical mean and the standard deviation of the sequence of numbers generated above of part (d).
+```{r}
+cat("Mean of Normal distribution with Polar-Marsaglia method is ",mean(z2))
+cat("Standard Deviation of Normal distribution with Polar-Marsaglia method is ",sd(z2))
+
+
+```
+(f) Now compare the efficiencies of the two above-algorithms, by comparing the execution times to generate 5,000 normally distributed random numbers by the two methods. Which one is more efficient? If you do not see a clear difference, you need to increase the number of generated realizations of random variables to 10,000, 20,000, etc.
+
+```{r}
+time_box=b-a
+time_polar=b2-a2
+```
+Time taken to generate normal distribution using Box-Muller is `r time_box`
+
+Time taken to generate normal distribution using Polar-Marsaglia is `r time_polar`
+
+Clearly time taken for Box-Muller is less than the same required for Polar-Marsaglia. This is due to the fact a lot of computation is required while using Polar-Marsaglia method in if conditions.
