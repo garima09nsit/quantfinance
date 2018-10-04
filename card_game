@@ -1,0 +1,29 @@
+from functools import lru_cache
+
+x = []
+
+
+@lru_cache(maxsize=None)
+def expected_value(A):
+    if A[1] == 0:
+        return 0
+    if A[0] == 1:
+        return 1
+
+    if A[3] > 0:
+        out1 = (A[0] - 1,(A[1] - 1), (A[2]), A[3] + 1,  0)
+        result1 = (A[1] / A[0]) * (A[3] +1 + expected_value(out1))
+        out2 = (A[0] - 1, A[1],(A[2] - 1), 0,  1)
+        result2 = (A[2] / A[0]) * (-1 + expected_value(out2))
+    else:
+        out1 = (A[0] - 1, (A[1] - 1), (A[2]),  1, 0)
+        result1 = (A[1] / A[0]) * (1 + expected_value(out1))
+        out2 = (A[0] - 1,  (A[1]),(A[2] - 1), 0, A[4] + 1)
+        result2 = (A[2] / A[0]) * (-A[4]-1 + expected_value(out2))
+
+    result = result1 + result2
+    return max(0, result)
+
+print(expected_value((2,1,1,0,0)))
+print(expected_value((52,26,26,0,0)))
+#print(sum(x) / len(x))
