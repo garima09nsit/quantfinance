@@ -22,8 +22,10 @@ def expected_value(A):
         result2 = (A[2] / A[0]) * (-A[4]-1 + expected_value(out2))
 
     result = result1 + result2
+    if(result<0):
+        x.append(52-A[0])
     return max(0, result)
 
 print(expected_value((2,1,1,0,0)))
 print(expected_value((52,26,26,0,0)))
-#print(sum(x) / len(x))
+print(sum(x) / len(x))
