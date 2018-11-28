@@ -1,4 +1,4 @@
-JMG Final Run - Bond Valuation
+#Bond Valuation
 We now graduate to doing something really serious... I mean, really really serious things that are relevant to our business - bond valuation. By the end of this week, you will know how to price a vanilla bond and be able to challenge the QARM team's calculation if they ever get it wrong! ^_^
 
 Part 1 - Payment Schedule
