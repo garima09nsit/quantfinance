@@ -1,3 +1,8 @@
+"""
+Find the expected value of a card game where you get $1 for first red card drawn, $2 dollars for second consecutive red and $3 for 3rd red until you get a black where you loose $1 for 1st black, $2 for 2nd consecutive black and $3 for 3rd black and so on until the cycle is turned by getting a red for which you $1.
+You can stop playing at any moment and take the cash with you. Its without replacement.
+Also find the optimal staopping point for the game.
+"""
 from functools import lru_cache
 
 x = []
